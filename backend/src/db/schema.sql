@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS destinos (
   resumen         TEXT NOT NULL,               -- contenido propio, no copiado
   fuente_url      TEXT NOT NULL,               -- backlink a la fuente original
   fuente_nombre   TEXT,
+  origen          TEXT NOT NULL DEFAULT 'auto' CHECK (origen IN ('auto', 'manual')), -- 'auto' = generado por el refresh de cache, 'manual' = curado a mano y protegido de sobreescritura
   actualizado_at  TEXT NOT NULL DEFAULT (datetime('now')),  -- para cache periódico
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE (pais, ciudad, titulo)

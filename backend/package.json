@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "db:init": "node src/db/init.js",
-    "seed:admin": "node src/db/seedAdmin.js"
+    "seed:admin": "node src/db/seedAdmin.js",
+    "destinos:refresh": "node src/db/refreshDestinos.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

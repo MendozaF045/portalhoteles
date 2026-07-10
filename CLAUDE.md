@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Phase 1 (folder structure, Express skeleton, SQLite schema) and Phase 2 (REST endpoints) are done — see `README.md` for phase status and `API.md` for full endpoint docs. No frontend yet. **Read `SPEC.md` in full before writing any code**; it is the source of truth for scope, and any change of scope must be reflected there first, per the doc's own instructions.
+Phase 1 (folder structure, Express skeleton, SQLite schema), Phase 2 (core REST endpoints), and Phase 3 (Destinos endpoints + simulated cache refresh) are done — see `README.md` for phase status and `API.md` for full endpoint docs. No frontend yet. **Read `SPEC.md` in full before writing any code**; it is the source of truth for scope, and any change of scope must be reflected there first, per the doc's own instructions.
 
 There is no test suite or linter configured yet — verification so far has been manual (curl/Postman flows against a running server). If you add a test runner or linter, record the actual commands here.
 
@@ -16,6 +16,7 @@ npm install
 cp .env.example .env       # set JWT_SECRET / SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD
 npm run db:init             # (re)creates the SQLite schema, idempotent
 npm run seed:admin          # creates/updates the super_admin row from .env
+npm run destinos:refresh    # simulated Destinos cache refresh (see below)
 npm run dev                 # node --watch src/server.js
 npm start
 ```
@@ -33,6 +34,9 @@ Layout: `backend/src/{config,db,routes,controllers,middleware,utils}`. Routes ar
 - **Password reset** (`authHotel.controller.js`): `forgot-password` always returns a generic 200 regardless of whether the email exists (no user enumeration), but — since there's no email service yet — includes the raw reset token in the JSON response when the account does exist, clearly marked `dev_note`. Replace this with real email delivery before anything resembling production use.
 - **Super admin has no public registration endpoint** by design (spec: "acceso único y exclusivo"). The account is created/rotated via `npm run seed:admin` (`src/db/seedAdmin.js`), reading `SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD` from `.env`.
 - **Admin-added hotels still start `activo: 0`**: the super admin's `POST /admin/hoteles` cannot bypass the activation rule — only the hotel's own `/hotel/activar` can flip that flag. Don't add an admin override; it's an explicit roles/permissions QA boundary (spec section 12).
+- **Destinos content has two origins**: `auto` (written by the simulated cache refresh) and `manual` (created or edited via the admin CRUD). `PUT /admin/destinos/:id` always sets `origen = 'manual'` on save, and the refresh's `INSERT ... ON CONFLICT DO UPDATE ... WHERE destinos.origen = 'auto'` (`services/destinosRefresh.js`) is what makes manual edits permanent against future refreshes. Don't change that `WHERE` clause without preserving that guarantee — it's the whole point of the two-origin design.
+- **The Destinos refresh is simulated, not real** (spec section 4 wants a periodic cache from external sources; there's no internet integration yet). `buildSimulatedEntry()` in `services/destinosRefresh.js` fabricates one placeholder entry per distinct `pais`/`ciudad` pair found in `hoteles` (regardless of `activo`), clearly labeled as simulated (`fuente_nombre: "Fuente simulada..."`, a fake `fuente-simulada.example` URL). It's called from both `POST /admin/destinos/refresh` and the standalone `npm run destinos:refresh` script (`db/refreshDestinos.js`) — keep sharing that one function rather than duplicating the upsert logic. When a real source is connected later, that's the only function that should need to change.
+- **Schema changes require a fresh local DB**: `data/portalhoteles.db` is gitignored and `schema.sql` uses `CREATE TABLE IF NOT EXISTS`, so a column added later (e.g. `destinos.origen` in Phase 3) won't retroactively apply to an existing dev database. If a fresh `npm run db:init` errors or behaves oddly after pulling schema changes, delete `backend/data/` and re-run `db:init` (+ `seed:admin`) — there's no real data to lose in this dev-only sandbox.
 
 ## What this project is
 
@@ -69,7 +73,7 @@ Enforcing the role/permission boundary strictly matters here — it's called out
 ## Key routes / pages (spec section references)
 
 - `/` — Home: featured hotel banner (carousel, admin-managed), alphabetical hotel listing, filters (país/ciudad/rango de precio)
-- `/destinos` — Destination content per country/city, cached periodically from external sources. **Never copy source text verbatim** — must be original summary + backlink to source.
+- `/destinos` — Destination content per country/city, cached periodically from external sources. **Never copy source text verbatim** — must be original summary + backlink to source. Backend: `GET /api/public/destinos` (see API.md); the "periodic cache" is currently simulated, not a real fetch — see the Destinos bullets above.
 - `/contacto` — General platform contact form (not hotel-specific)
 - Registro / Login / password recovery for hotels
 - Hotel panel (post-login): datos generales (7.1), habitaciones (7.2, min 4), estado Activar/Desactivar (7.3)

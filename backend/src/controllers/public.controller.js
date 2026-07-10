@@ -47,4 +47,28 @@ async function listHoteles(req, res) {
   res.json({ hoteles: rows });
 }
 
-module.exports = { listHoteles };
+async function listDestinos(req, res) {
+  const { pais, ciudad } = req.query;
+  const clauses = [];
+  const params = [];
+
+  if (pais) {
+    clauses.push('pais = ?');
+    params.push(pais);
+  }
+  if (ciudad) {
+    clauses.push('ciudad = ?');
+    params.push(ciudad);
+  }
+
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const sql = `SELECT id, pais, ciudad, titulo, resumen, fuente_url, fuente_nombre, actualizado_at
+    FROM destinos
+    ${where}
+    ORDER BY pais COLLATE NOCASE ASC, ciudad COLLATE NOCASE ASC, titulo COLLATE NOCASE ASC`;
+
+  const rows = db.prepare(sql).all(...params);
+  res.json({ destinos: rows });
+}
+
+module.exports = { listHoteles, listDestinos };

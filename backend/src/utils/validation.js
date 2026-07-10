@@ -16,9 +16,22 @@ function isNonNegativeNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
+function isValidUrl(value) {
+  if (typeof value !== 'string') {
+    return false;
+  }
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   isValidEmail,
   isNonEmptyString,
   isPositiveInteger,
   isNonNegativeNumber,
+  isValidUrl,
 };

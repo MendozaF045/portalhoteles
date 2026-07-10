@@ -1,4 +1,4 @@
-# API.md — PortalHoteles.com (Fase 2)
+# API.md — PortalHoteles.com (Fase 2 + Fase 3)
 
 Documentación de los endpoints REST del backend, pensada para probarse con Postman (o cualquier cliente HTTP) sin pasar por la UI. Ver [SPEC.md](./SPEC.md) para las reglas de negocio completas.
 
@@ -211,6 +211,25 @@ Respuesta `200`:
 ```
 `precio_min`/`precio_max` no numéricos responden `400`.
 
+### `GET /public/destinos`
+
+Lista el contenido de la pestaña Destinos (SPEC.md sección 4): resumen propio + backlink a la fuente, por país/ciudad. Filtros opcionales combinables por querystring: `pais`, `ciudad` (match exacto). Orden: país, luego ciudad, luego título (alfabético, case-insensitive).
+
+Respuesta `200`:
+```json
+{
+  "destinos": [
+    {
+      "id": 2, "pais": "Peru", "ciudad": "Cusco",
+      "titulo": "Explora Cusco, Peru",
+      "resumen": "...", "fuente_url": "https://...", "fuente_nombre": "...",
+      "actualizado_at": "2026-07-10 21:41:55"
+    }
+  ]
+}
+```
+No incluye `origen` ni `created_at` (son detalle de gestión interna, no del consumo público).
+
 ---
 
 ## 4. Auth de super admin — `/auth/admin`
@@ -253,6 +272,66 @@ Respuesta `201` con el hotel creado. Errores: `400`, `409` (si el email ya exist
 
 Elimina el hotel (sus habitaciones se eliminan en cascada) y, si tenía cuenta de login asociada, también la elimina. Respuesta `204`. `404` si el id no existe.
 
+### Destinos — `/admin/destinos` (SPEC.md sección 4)
+
+Gestión del contenido de la pestaña Destinos. Cada entrada tiene un campo `origen`:
+
+| `origen` | Cómo se genera | Se sobrescribe con el refresh (sección 6)? |
+|---|---|---|
+| `auto` | Generado por `POST /admin/destinos/refresh` (o el script `npm run destinos:refresh`) | Sí |
+| `manual` | Creado con `POST` o cualquier entrada editada con `PUT` (el `PUT` siempre marca `origen: manual`, aunque haya empezado como `auto`) | No — queda protegida |
+
+**`GET /admin/destinos`** — lista todas las entradas (activas o no en el público, cualquier `origen`). Filtros opcionales: `pais`, `ciudad`. Incluye todos los campos, incluyendo `origen` y `created_at`.
+
+**`POST /admin/destinos`** — crea una entrada manual.
+Body:
+```json
+{
+  "pais": "Chile",
+  "ciudad": "Santiago",
+  "titulo": "Que hacer en Santiago",
+  "resumen": "Resumen propio sobre Santiago, nunca copiado de otra pagina.",
+  "fuente_url": "https://es.wikivoyage.org/wiki/Santiago_de_Chile",
+  "fuente_nombre": "Wikivoyage"
+}
+```
+Requeridos: `pais`, `ciudad`, `titulo`, `resumen` (strings no vacíos), `fuente_url` (URL `http(s)` válida — el backlink obligatorio a la fuente original). Opcional: `fuente_nombre`. Respuesta `201`. Errores: `400`, `409` (ya existe una entrada con el mismo `pais`+`ciudad`+`titulo`).
+
+**`PUT /admin/destinos/:id`** — edita (acepta cualquier subconjunto de los campos de arriba). Siempre deja `origen: manual` al guardar, para que un refresh posterior no la pise. Respuesta `200`. Errores: `400`, `404`, `409` (si el cambio de `pais`/`ciudad`/`titulo` colisiona con otra entrada existente).
+
+**`DELETE /admin/destinos/:id`** — elimina la entrada. Respuesta `204`. `404` si no existe.
+
+---
+
+## 6. Refresh de destinos (cache simulado) — SPEC.md sección 4
+
+La spec pide "actualización periódica (cache, ej. semanal) desde fuentes externas confiables". Como todavía no hay una integración real con internet, este refresh está **simulado**: genera contenido placeholder por cada `pais`/`ciudad` donde haya al menos un hotel registrado (activo o no), y lo marca claramente como simulado (`fuente_nombre: "Fuente simulada (pendiente de integracion real)"`, `fuente_url` apunta a un dominio de ejemplo, no a una fuente real). Nunca sobrescribe entradas `manual`. Cuando se conecte una fuente real, solo hay que reemplazar `backend/src/services/destinosRefresh.js` (`buildSimulatedEntry`) — el resto (upsert, protección de entradas manuales, endpoint, script) no debería cambiar.
+
+Dos formas equivalentes de dispararlo (comparten la misma lógica en `services/destinosRefresh.js`):
+
+### `POST /admin/destinos/refresh`
+
+Requiere token `super_admin`. Pensado para probarlo desde Postman o dispararlo desde un futuro botón de panel admin.
+
+Respuesta `200`:
+```json
+{
+  "message": "Refresco simulado ejecutado (no se conecto a ninguna fuente externa real todavia)",
+  "paresProcesados": 2,
+  "entradasActualizadas": 1
+}
+```
+`paresProcesados` = cantidad de combinaciones país/ciudad distintas encontradas en `hoteles`. `entradasActualizadas` puede ser menor si alguna de esas entradas es `manual` (protegida) — en el ejemplo de arriba, de 2 pares solo se tocó 1 porque el otro ya estaba curado a mano.
+
+### `npm run destinos:refresh`
+
+Script de línea de comandos (`backend/src/db/refreshDestinos.js`) que corre la misma función directo contra la base de datos, sin pasar por HTTP ni requerir token. Pensado para eventualmente programarse en un cron job (ej. semanal, como pide la spec) el día que haya una fuente real conectada.
+
+```bash
+cd backend
+npm run destinos:refresh
+```
+
 ---
 
 ## Resumen de endpoints
@@ -271,11 +350,17 @@ Elimina el hotel (sus habitaciones se eliminan en cascada) y, si tenía cuenta d
 | POST | `/hotel/activar` | hotel | Activar (requiere ≥4 habitaciones) |
 | POST | `/hotel/desactivar` | hotel | Desactivar |
 | GET | `/public/hoteles` | — | Listado de hoteles activos con filtros |
+| GET | `/public/destinos` | — | Listado de destinos con filtros |
 | POST | `/auth/admin/login` | — | Login de super admin |
 | GET | `/admin/hoteles/activos` | super_admin | Listado completo de hoteles activos |
 | GET | `/admin/hoteles/inactivos` | super_admin | Listado completo de hoteles inactivos |
 | POST | `/admin/hoteles` | super_admin | Agregar hotel manualmente |
 | DELETE | `/admin/hoteles/:id` | super_admin | Eliminar hotel |
+| GET | `/admin/destinos` | super_admin | Listar todas las entradas de destinos |
+| POST | `/admin/destinos` | super_admin | Crear entrada de destino manual |
+| PUT | `/admin/destinos/:id` | super_admin | Editar entrada de destino |
+| DELETE | `/admin/destinos/:id` | super_admin | Eliminar entrada de destino |
+| POST | `/admin/destinos/refresh` | super_admin | Disparar el refresh simulado de cache |
 | GET | `/health` | — | Chequeo de salud del servidor |
 
 ## Pendiente para próximas fases
@@ -283,4 +368,5 @@ Elimina el hotel (sus habitaciones se eliminan en cascada) y, si tenía cuenta d
 - Endpoints para editar datos generales del hotel (7.1) después del registro inicial
 - Subida de archivos (logo, fotos de habitaciones) — hoy `logo_url`/`fotos` son solo strings/URLs
 - Envío real de correo para recuperación de contraseña
-- Endpoints de `/destinos`, `/contacto`, banner destacado (sección 9.1) y perfil público detallado por hotel (`/[slug]`)
+- Conectar `destinosRefresh.js` a una fuente externa real (hoy genera contenido simulado)
+- Endpoints de `/contacto`, banner destacado (sección 9.1) y perfil público detallado por hotel (`/[slug]`)
