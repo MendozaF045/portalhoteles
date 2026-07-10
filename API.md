@@ -1,4 +1,4 @@
-# API.md — PortalHoteles.com (Fase 2 + Fase 3)
+# API.md — PortalHoteles.com (Fases 2 a 4)
 
 Documentación de los endpoints REST del backend, pensada para probarse con Postman (o cualquier cliente HTTP) sin pasar por la UI. Ver [SPEC.md](./SPEC.md) para las reglas de negocio completas.
 
@@ -230,6 +230,47 @@ Respuesta `200`:
 ```
 No incluye `origen` ni `created_at` (son detalle de gestión interna, no del consumo público).
 
+### `POST /public/hoteles/:slug/reservas`
+
+Formulario de reserva del perfil público del hotel (SPEC.md sección 8). No requiere autenticación ni persiste nada en la base de datos: valida los datos y arma un link `wa.me` con el mensaje precargado, listo para que el navegador redirija a WhatsApp. No hay pasarela de pago (fuera de alcance).
+
+Body:
+```json
+{
+  "nombre": "Juan Perez",
+  "habitacion_id": 1,
+  "fecha_entrada": "2026-08-01",
+  "fecha_salida": "2026-08-05",
+  "huespedes": 2
+}
+```
+
+Validaciones, en orden (la primera que falla corta la request con `400`, salvo las de "no encontrado" que son `404`):
+
+| Campo | Regla | Error si falla |
+|---|---|---|
+| `:slug` en la URL | El hotel debe existir | `404 Hotel no encontrado` |
+| `nombre` | String no vacío | `400` |
+| `habitacion_id` | Entero positivo | `400` |
+| `fecha_entrada`, `fecha_salida` | Formato `YYYY-MM-DD`, fecha de calendario real (rechaza p.ej. `2026-02-30`) | `400` |
+| `huespedes` | Entero positivo | `400` |
+| `fecha_entrada` | No puede ser una fecha pasada (se compara contra la fecha UTC del servidor) | `400 fecha_entrada no puede ser una fecha pasada` |
+| `fecha_salida` | Debe ser **estrictamente posterior** a `fecha_entrada` (fechas iguales tambien fallan) | `400 fecha_salida debe ser posterior a fecha_entrada` |
+| `habitacion_id` | Debe existir **y pertenecer a este hotel** (una habitación de otro hotel da `404`, no se filtra su existencia) | `404 Habitacion no encontrada en este hotel` |
+| `huespedes` | No puede superar la `capacidad_huespedes` de la habitación — este es el caso límite explícito: probar con `huespedes` exactamente igual a la capacidad (debe pasar) y capacidad+1 (debe fallar) | `400 La habitacion admite un maximo de N huesped(es)` |
+| hotel | Debe tener `whatsapp_numero` configurado | `400 Este hotel no tiene un numero de WhatsApp configurado` |
+
+Respuesta `200`:
+```json
+{
+  "whatsapp_url": "https://wa.me/201234567890?text=Hola%2C%20mi%20nombre...",
+  "mensaje": "Hola, mi nombre es Juan Perez. Quiero reservar la habitacion \"Habitacion doble\" en Hotel Faraon del 2026-08-01 al 2026-08-05 para 2 huesped(es).",
+  "hotel": { "id": 1, "slug": "hotel-faraon", "nombre": "Hotel Faraon" },
+  "habitacion": { "id": 1, "descripcion": "Habitacion doble", "capacidad_huespedes": 2 }
+}
+```
+`whatsapp_numero` se normaliza a solo dígitos (se aceptan `+`, espacios y guiones al cargarlo en el perfil del hotel) antes de armar la URL `wa.me`, como pide el formato de esa API.
+
 ---
 
 ## 4. Auth de super admin — `/auth/admin`
@@ -334,6 +375,48 @@ npm run destinos:refresh
 
 ---
 
+## 7. Contacto general de la plataforma — SPEC.md sección 5
+
+Formulario de contacto general (no de un hotel específico).
+
+### `POST /api/contacto`
+
+Nota: esta es la única ruta que **no** cuelga de `/api/...` con un sub-prefijo de área (`/auth`, `/hotel`, `/public`, `/admin`) — vive directo en `/api/contacto`, tal como la pide la spec.
+
+Body:
+```json
+{
+  "nombre": "Maria Lopez",
+  "email": "maria@example.com",
+  "asunto": "Consulta general",
+  "mensaje": "Hola, quisiera saber como listar mi hotel."
+}
+```
+Requeridos: `nombre`, `email` (formato válido), `mensaje` (strings no vacíos). Opcional: `asunto`.
+
+El mensaje se guarda en la tabla `contactos` (para poder verificarlo después vía `GET /admin/contactos`) y además se "envía" — hoy simulado con un `console.log` en el servidor, ya que no hay integración de correo real todavía.
+
+Respuesta `201`:
+```json
+{
+  "message": "Mensaje recibido correctamente",
+  "dev_note": "No hay envio de correo real configurado todavia; el mensaje se guarda en la base de datos y se loggea en la consola del servidor.",
+  "contacto_id": 1
+}
+```
+Errores: `400` (campos faltantes o email inválido).
+
+### `GET /admin/contactos`
+
+Requiere token `super_admin`. Lista todos los mensajes de contacto recibidos, más recientes primero — pensado para verificar que el formulario efectivamente está guardando (no hay UI de admin todavía).
+
+Respuesta `200`:
+```json
+{ "contactos": [ { "id": 1, "nombre": "Maria Lopez", "email": "maria@example.com", "asunto": "Consulta general", "mensaje": "...", "created_at": "..." } ] }
+```
+
+---
+
 ## Resumen de endpoints
 
 | Método | Ruta | Auth | Descripción |
@@ -351,6 +434,8 @@ npm run destinos:refresh
 | POST | `/hotel/desactivar` | hotel | Desactivar |
 | GET | `/public/hoteles` | — | Listado de hoteles activos con filtros |
 | GET | `/public/destinos` | — | Listado de destinos con filtros |
+| POST | `/public/hoteles/:slug/reservas` | — | Generar link de reserva a WhatsApp |
+| POST | `/contacto` | — | Enviar mensaje de contacto general |
 | POST | `/auth/admin/login` | — | Login de super admin |
 | GET | `/admin/hoteles/activos` | super_admin | Listado completo de hoteles activos |
 | GET | `/admin/hoteles/inactivos` | super_admin | Listado completo de hoteles inactivos |
@@ -361,12 +446,13 @@ npm run destinos:refresh
 | PUT | `/admin/destinos/:id` | super_admin | Editar entrada de destino |
 | DELETE | `/admin/destinos/:id` | super_admin | Eliminar entrada de destino |
 | POST | `/admin/destinos/refresh` | super_admin | Disparar el refresh simulado de cache |
+| GET | `/admin/contactos` | super_admin | Listar mensajes de contacto recibidos |
 | GET | `/health` | — | Chequeo de salud del servidor |
 
 ## Pendiente para próximas fases
 
 - Endpoints para editar datos generales del hotel (7.1) después del registro inicial
 - Subida de archivos (logo, fotos de habitaciones) — hoy `logo_url`/`fotos` son solo strings/URLs
-- Envío real de correo para recuperación de contraseña
+- Envío real de correo para recuperación de contraseña y para el formulario de contacto
 - Conectar `destinosRefresh.js` a una fuente externa real (hoy genera contenido simulado)
-- Endpoints de `/contacto`, banner destacado (sección 9.1) y perfil público detallado por hotel (`/[slug]`)
+- Banner destacado (sección 9.1) y perfil público detallado por hotel (`/[slug]`)

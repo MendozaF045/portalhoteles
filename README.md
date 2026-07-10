@@ -2,9 +2,9 @@
 
 Plataforma tipo directorio/marketplace de hoteles. Ver [SPEC.md](./SPEC.md) para la especificación completa del proyecto.
 
-## Estado actual: Fase 3
+## Estado actual: Fase 4
 
-Fase 1 entregó la base (estructura, Express, esquema SQLite). Fase 2 agregó los endpoints REST principales: auth de hotel (JWT), CRUD de habitaciones, activar/desactivar, listado público con filtros, y auth + gestión de super admin. Fase 3 agrega los endpoints de Destinos (contenido por país/ciudad, resumen propio + backlink) y un refresh de cache simulado (todavía sin fuente externa real conectada). Ver [API.md](./API.md) para el detalle de cada endpoint (pensado para probarse con Postman). Todavía no hay frontend.
+Fase 1 entregó la base (estructura, Express, esquema SQLite). Fase 2 agregó los endpoints REST principales: auth de hotel (JWT), CRUD de habitaciones, activar/desactivar, listado público con filtros, y auth + gestión de super admin. Fase 3 sumó los endpoints de Destinos (contenido por país/ciudad, resumen propio + backlink) y un refresh de cache simulado. Fase 4 agrega el link de reserva a WhatsApp (con validación de fechas y de capacidad de la habitación) y el formulario de contacto general de la plataforma. Ver [API.md](./API.md) para el detalle de cada endpoint (pensado para probarse con Postman). Todavía no hay frontend.
 
 ## Estructura
 
@@ -64,11 +64,12 @@ Tablas:
 | `hoteles` | Datos generales de cada hotel (perfil, ubicación, estado activo/inactivo) |
 | `habitaciones` | Habitaciones de cada hotel (FK a `hoteles`, un hotel necesita mínimo 4 para poder activarse) |
 | `destinos` | Contenido de la pestaña Destinos por país/ciudad (resumen propio + backlink a la fuente) |
+| `contactos` | Mensajes del formulario de contacto general de la plataforma |
 
 ## Próximas fases
 
 - Frontend en React
 - Subida de archivos (logo, fotos de habitaciones)
-- Envío real de correo para recuperación de contraseña
+- Envío real de correo para recuperación de contraseña y para el formulario de contacto
 - Conectar el refresh de Destinos a una fuente externa real (hoy es simulado)
-- Endpoints de `/contacto`, banner destacado, perfil público por hotel
+- Banner destacado y perfil público detallado por hotel

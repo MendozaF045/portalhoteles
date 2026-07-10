@@ -9,6 +9,7 @@ const authAdminRoutes = require('./routes/authAdmin.routes');
 const hotelRoutes = require('./routes/hotel.routes');
 const publicRoutes = require('./routes/public.routes');
 const adminRoutes = require('./routes/admin.routes');
+const contactoRoutes = require('./routes/contacto.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -25,6 +26,7 @@ app.use('/api/auth/admin', authAdminRoutes);
 app.use('/api/hotel', hotelRoutes);
 app.use('/api/public', publicRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/contacto', contactoRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

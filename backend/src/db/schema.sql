@@ -78,3 +78,13 @@ CREATE TABLE IF NOT EXISTS destinos (
 );
 
 CREATE INDEX IF NOT EXISTS idx_destinos_pais_ciudad ON destinos(pais, ciudad);
+
+-- Mensajes del formulario de contacto general de la plataforma (no de un hotel especifico).
+CREATE TABLE IF NOT EXISTS contactos (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  nombre      TEXT NOT NULL,
+  email       TEXT NOT NULL,
+  asunto      TEXT,
+  mensaje     TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
