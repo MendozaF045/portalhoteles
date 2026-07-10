@@ -25,6 +25,16 @@ export function AuthProvider({ children }) {
       setAuth(data);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     },
+    updateHotel: (hotelData) => {
+      setAuth((current) => {
+        if (!current) {
+          return current;
+        }
+        const next = { ...current, hotel: hotelData };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        return next;
+      });
+    },
     logout: () => {
       setAuth(null);
       localStorage.removeItem(STORAGE_KEY);

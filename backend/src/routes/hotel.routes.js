@@ -10,6 +10,7 @@ const router = express.Router();
 router.use(requireAuth, requireRole('hotel'));
 
 router.get('/me', asyncHandler(authHotelCtrl.getMe));
+router.put('/me', asyncHandler(authHotelCtrl.updateMe));
 
 router.post('/activar', asyncHandler(estadoCtrl.activar));
 router.post('/desactivar', asyncHandler(estadoCtrl.desactivar));

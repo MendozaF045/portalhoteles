@@ -654,3 +654,151 @@ select {
 .form-banner--success .btn {
   margin-top: 0.5rem;
 }
+
+/* Panel de hotel */
+
+.panel-hotel {
+  padding: 2.5rem 1.25rem 4rem;
+  max-width: 48rem;
+}
+
+.panel-hotel__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.panel-hotel__header h1 {
+  font-size: 1.6rem;
+  margin-bottom: 0.25rem;
+}
+
+.panel-hotel__subtitle {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.panel-section {
+  padding: 1.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.panel-section h2 {
+  font-size: 1.2rem;
+  margin-bottom: 1.1rem;
+}
+
+.panel-section__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+
+.panel-section__header h2 {
+  margin-bottom: 0;
+}
+
+/* Activacion */
+
+.panel-activacion__progreso {
+  margin-bottom: 1rem;
+}
+
+.panel-activacion__barra {
+  height: 0.5rem;
+  border-radius: 999px;
+  background-color: var(--color-surface-alt);
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.panel-activacion__barra-fill {
+  height: 100%;
+  background-color: var(--color-accent);
+  transition: width 0.2s ease;
+}
+
+.panel-activacion__texto {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.panel-activacion__aviso {
+  color: #d97a5f;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.panel-activacion__estado-actual {
+  margin: 0.85rem 0 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+/* Habitaciones */
+
+.panel-habitaciones__vacio {
+  color: var(--color-text-muted);
+}
+
+.panel-habitaciones__lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.panel-habitacion {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-alt);
+}
+
+.panel-habitacion__info {
+  flex: 1;
+  min-width: 12rem;
+}
+
+.panel-habitacion__descripcion {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+}
+
+.panel-habitacion__detalle {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.panel-habitacion__acciones {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.habitacion-form {
+  padding: 1.25rem;
+  margin-bottom: 1.1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-alt);
+}
+
+.habitacion-form__acciones {
+  display: flex;
+  gap: 0.75rem;
+}

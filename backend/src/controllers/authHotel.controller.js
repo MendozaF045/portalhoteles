@@ -179,6 +179,38 @@ async function getMe(req, res) {
   });
 }
 
+async function updateMe(req, res) {
+  const hotel = db.prepare('SELECT * FROM hoteles WHERE id = ?').get(req.auth.hotelId);
+  if (!hotel) {
+    throw new HttpError(404, 'Hotel no encontrado');
+  }
+
+  const {
+    nombre, pais, ciudad, descripcion, website_url: websiteUrl, logo_url: logoUrl,
+  } = req.body || {};
+
+  if (nombre !== undefined && !isNonEmptyString(nombre)) throw new HttpError(400, 'nombre invalido');
+  if (pais !== undefined && !isNonEmptyString(pais)) throw new HttpError(400, 'pais invalido');
+  if (ciudad !== undefined && !isNonEmptyString(ciudad)) throw new HttpError(400, 'ciudad invalido');
+
+  db.prepare(`UPDATE hoteles SET
+      nombre = ?, pais = ?, ciudad = ?, descripcion = ?, website_url = ?, logo_url = ?,
+      updated_at = datetime('now')
+    WHERE id = ?`)
+    .run(
+      nombre ?? hotel.nombre,
+      pais ?? hotel.pais,
+      ciudad ?? hotel.ciudad,
+      descripcion !== undefined ? (descripcion || null) : hotel.descripcion,
+      websiteUrl !== undefined ? (websiteUrl || null) : hotel.website_url,
+      logoUrl !== undefined ? (logoUrl || null) : hotel.logo_url,
+      hotel.id,
+    );
+
+  const row = db.prepare('SELECT * FROM hoteles WHERE id = ?').get(hotel.id);
+  res.json({ hotel: hotelPublicShape(row) });
+}
+
 module.exports = {
-  registro, login, forgotPassword, resetPassword, getMe, hotelPublicShape,
+  registro, login, forgotPassword, resetPassword, getMe, updateMe, hotelPublicShape,
 };

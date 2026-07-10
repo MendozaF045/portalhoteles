@@ -2,9 +2,9 @@
 
 Plataforma tipo directorio/marketplace de hoteles. Ver [SPEC.md](./SPEC.md) para la especificación completa del proyecto.
 
-## Estado actual: Fase 6
+## Estado actual: Fase 7
 
-Fase 1 entregó la base (estructura, Express, esquema SQLite). Fase 2 agregó los endpoints REST principales: auth de hotel (JWT), CRUD de habitaciones, activar/desactivar, listado público con filtros, y auth + gestión de super admin. Fase 3 sumó los endpoints de Destinos y un refresh de cache simulado. Fase 4 agregó el link de reserva a WhatsApp y el formulario de contacto general. Fase 5 arrancó el frontend en React (Vite) con el Home público completo, y sumó al backend el CRUD del banner destacado que el Home necesitaba consumir. Fase 6 conecta Registro, Login, y recuperación/restablecimiento de contraseña del hotel al frontend, con sesión persistida y una ruta protegida `/panel-hotel` (placeholder por ahora — el panel real es la próxima fase). Ver [API.md](./API.md) para el detalle de cada endpoint. Destinos, Contacto, y los paneles de admin siguen siendo placeholders.
+Fase 1 entregó la base (estructura, Express, esquema SQLite). Fase 2 agregó los endpoints REST principales: auth de hotel (JWT), CRUD de habitaciones, activar/desactivar, listado público con filtros, y auth + gestión de super admin. Fase 3 sumó los endpoints de Destinos y un refresh de cache simulado. Fase 4 agregó el link de reserva a WhatsApp y el formulario de contacto general. Fase 5 arrancó el frontend en React (Vite) con el Home público completo, y sumó al backend el CRUD del banner destacado que el Home necesitaba consumir. Fase 6 conectó Registro, Login, y recuperación/restablecimiento de contraseña del hotel al frontend, con sesión persistida. Fase 7 construye el panel real del hotel (`/panel-hotel`): editar datos generales, CRUD de habitaciones, indicador de progreso hacia el mínimo de 4, y activar/desactivar — y suma al backend el `PUT /api/hotel/me` que ese formulario necesitaba. Ver [API.md](./API.md) para el detalle de cada endpoint. Destinos, Contacto, el perfil público de hotel y el panel de super admin siguen siendo placeholders (o no existen todavía).
 
 ## Estructura
 
@@ -27,8 +27,9 @@ Fase 1 entregó la base (estructura, Express, esquema SQLite). Fase 2 agregó lo
         ├── api/           # cliente fetch hacia el backend
         ├── context/       # ThemeContext (modo oscuro/claro), AuthContext (sesión de hotel)
         ├── components/    # Header, Footer, Layout, BannerCarousel, HotelCard, HotelFilters, HotelList, FormField, PrivateRoute
-        ├── pages/         # Home, Registro, Login, RecuperarPassword, RestablecerPassword (completos)
-        │                  # + placeholders (Destinos, Contacto, PanelHotel, perfil de hotel)
+        │   └── panel/       # PanelDatosGenerales, PanelHabitaciones, HabitacionForm, PanelActivacion
+        ├── pages/         # Home, Registro, Login, RecuperarPassword, RestablecerPassword, PanelHotel (completos)
+        │                  # + placeholders (Destinos, Contacto, perfil de hotel)
         ├── styles/        # global.css (variables de color, tipografías, layout, formularios)
         └── utils/         # countryFlags (nombre de país -> emoji de bandera), validators (email)
 ```
@@ -105,15 +106,20 @@ Como el nombre del país se guarda como texto libre (no hay código ISO en el ba
 
 ### Estado
 
-Home (`/`), Registro (`/registro`), Login (`/login`), y recuperación/restablecimiento de contraseña (`/recuperar-password`, `/restablecer-password`) están construidos de punta a punta contra el backend real. La sesión (token + datos del hotel) se guarda en `localStorage` vía `AuthContext` y sobrevive a un refresh de página. `/panel-hotel` es una ruta protegida (`PrivateRoute` redirige a `/login` si no hay sesión) que hoy solo muestra un placeholder con botón de cerrar sesión — el panel real es la Fase 7.
+Home (`/`), Registro (`/registro`), Login (`/login`), recuperación/restablecimiento de contraseña, y el panel del hotel (`/panel-hotel`) están construidos de punta a punta contra el backend real. La sesión (token + datos del hotel) se guarda en `localStorage` vía `AuthContext` y sobrevive a un refresh de página. `/panel-hotel` es una ruta protegida (`PrivateRoute` redirige a `/login` si no hay sesión).
+
+El panel de hotel tiene tres secciones: **Estado de publicación** (barra de progreso X/4 habitaciones, botón Activar deshabilitado con mensaje claro hasta llegar al mínimo, Desactivar siempre disponible), **Datos generales** (editar nombre, país, ciudad, logo, descripción, link a la web propia), y **Habitaciones** (listar/crear/editar/eliminar, con selects de tipo de baño y tamaño de cama para datos consistentes). Cualquier cambio en habitaciones refresca automáticamente el indicador de activación.
 
 `/destinos`, `/contacto` y `/:slug` (perfil de hotel) siguen mostrando "Próximamente".
 
 **Nota sobre recuperación de contraseña**: como el backend todavía no envía emails reales (ver `dev_note` en la respuesta de `forgot-password`), la página `/recuperar-password` muestra el token de desarrollo directamente en pantalla con un botón para continuar — es un atajo intencional para poder probar el flujo completo sin Postman ni servidor de correo; hay que reemplazarlo cuando se conecte un servicio de email real.
 
+**Gap conocido** (ver también API.md): si un hotel activo elimina una habitación y queda por debajo de 4, no se desactiva automáticamente, y el listado público tampoco vuelve a filtrar por cantidad — solo por el flag `activo`. Documentado, no corregido en esta fase (es un cambio de lógica de negocio del backend, fuera del alcance de "Frontend - Panel del Hotel").
+
 ## Próximas fases
 
-- Frontend: panel real de hotel (datos generales, habitaciones, activar/desactivar), Destinos, Contacto, perfil público de hotel, panel de super admin (incluyendo la UI para gestionar el banner)
+- Frontend: Destinos, Contacto, perfil público de hotel, panel de super admin (incluyendo la UI para gestionar el banner)
+- Decidir y corregir el gap de activación vs. cantidad de habitaciones (ver arriba)
 - Subida de archivos (logo, fotos de habitaciones, imágenes de banner)
 - Envío real de correo para recuperación de contraseña y para el formulario de contacto
 - Conectar el refresh de Destinos a una fuente externa real (hoy es simulado)

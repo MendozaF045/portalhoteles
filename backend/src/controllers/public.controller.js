@@ -1,13 +1,18 @@
 const db = require('../config/database');
 const HttpError = require('../utils/httpError');
+const { MIN_HABITACIONES } = require('./hotelEstado.controller');
 
 async function listHoteles(req, res) {
   const {
     pais, ciudad, precio_min: precioMinRaw, precio_max: precioMaxRaw,
   } = req.query;
 
-  const clauses = ['activo = 1'];
-  const params = [];
+  // La regla de visibilidad es "activo Y >= MIN_HABITACIONES habitaciones" (SPEC.md
+  // seccion 3), nunca una sola de las dos condiciones. El conteo se recalcula en vivo
+  // (subquery correlacionada) como red de seguridad independiente de que `activo` este
+  // siempre sincronizado en cada punto de escritura.
+  const clauses = ['activo = 1', '(SELECT COUNT(*) FROM habitaciones WHERE habitaciones.hotel_id = hoteles.id) >= ?'];
+  const params = [MIN_HABITACIONES];
 
   if (pais) {
     clauses.push('pais = ?');

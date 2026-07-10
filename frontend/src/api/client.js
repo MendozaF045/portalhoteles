@@ -45,3 +45,39 @@ export function forgotPasswordHotel(datos) {
 export function resetPasswordHotel(datos) {
   return request('/auth/hotel/reset-password', { method: 'POST', body: JSON.stringify(datos) });
 }
+
+function authHeaders(token) {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export function getMisDatos(token) {
+  return request('/hotel/me', { headers: authHeaders(token) });
+}
+
+export function actualizarMisDatos(token, datos) {
+  return request('/hotel/me', { method: 'PUT', headers: authHeaders(token), body: JSON.stringify(datos) });
+}
+
+export function getMisHabitaciones(token) {
+  return request('/hotel/habitaciones', { headers: authHeaders(token) });
+}
+
+export function crearHabitacion(token, datos) {
+  return request('/hotel/habitaciones', { method: 'POST', headers: authHeaders(token), body: JSON.stringify(datos) });
+}
+
+export function actualizarHabitacion(token, id, datos) {
+  return request(`/hotel/habitaciones/${id}`, { method: 'PUT', headers: authHeaders(token), body: JSON.stringify(datos) });
+}
+
+export function eliminarHabitacion(token, id) {
+  return request(`/hotel/habitaciones/${id}`, { method: 'DELETE', headers: authHeaders(token) });
+}
+
+export function activarHotel(token) {
+  return request('/hotel/activar', { method: 'POST', headers: authHeaders(token) });
+}
+
+export function desactivarHotel(token) {
+  return request('/hotel/desactivar', { method: 'POST', headers: authHeaders(token) });
+}

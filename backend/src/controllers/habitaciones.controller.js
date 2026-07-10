@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const HttpError = require('../utils/httpError');
 const { isNonEmptyString, isPositiveInteger, isNonNegativeNumber } = require('../utils/validation');
+const { MIN_HABITACIONES } = require('./hotelEstado.controller');
 
 function habitacionShape(row) {
   return {
@@ -114,7 +115,23 @@ async function remove(req, res) {
   const id = Number(req.params.id);
   getOwnedOrThrow(id, req.auth.hotelId);
 
-  db.prepare('DELETE FROM habitaciones WHERE id = ?').run(id);
+  const eliminarYRevisarActivacion = db.transaction(() => {
+    db.prepare('DELETE FROM habitaciones WHERE id = ?').run(id);
+
+    const { count } = db
+      .prepare('SELECT COUNT(*) AS count FROM habitaciones WHERE hotel_id = ?')
+      .get(req.auth.hotelId);
+
+    // Red de seguridad: si el hotel queda por debajo del minimo, se desactiva
+    // automaticamente (la regla de la spec es "activo Y >= 4 habitaciones", nunca
+    // una sola de las dos). No hace nada si ya estaba inactivo.
+    if (count < MIN_HABITACIONES) {
+      db.prepare(`UPDATE hoteles SET activo = 0, updated_at = datetime('now') WHERE id = ? AND activo = 1`)
+        .run(req.auth.hotelId);
+    }
+  });
+
+  eliminarYRevisarActivacion();
   res.status(204).send();
 }
 

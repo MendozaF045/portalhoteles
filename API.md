@@ -141,6 +141,26 @@ Respuesta `200`:
 }
 ```
 
+### `PUT /hotel/me`
+
+Edita los datos generales del propio hotel (SPEC.md sección 7.1). Acepta cualquier subconjunto de los campos de abajo (solo actualiza lo enviado); enviar un campo como string vacío lo limpia (lo deja en `null`).
+
+Body:
+```json
+{
+  "nombre": "Hotel Faraon Deluxe",
+  "pais": "Egipto",
+  "ciudad": "Giza",
+  "descripcion": "El mejor hotel de Giza",
+  "website_url": "https://hotelfaraon.example",
+  "logo_url": "https://.../logo.png"
+}
+```
+
+Si se envían, `nombre`, `pais` y `ciudad` no pueden ser strings vacíos (`400` si lo son). **El `slug` nunca cambia**, aunque se edite `nombre` — es intencional, para no romper el link del perfil público (`/hotelfaraon`), el link del banner destacado, ni el link de reserva por WhatsApp, todos construidos con el slug original. No se puede editar `email`/`password` (usar el flujo de reset), ni `whatsapp_numero`/`precio_referencia` desde este endpoint (no hay UI para eso todavía), ni `activo` (usar `/hotel/activar` / `/hotel/desactivar`).
+
+Respuesta `200`: `{ "hotel": { "...": "..." } }`. Errores: `400`.
+
 ### Habitaciones — `/hotel/habitaciones`
 
 Todas las operaciones están limitadas a las habitaciones del hotel dueño del token; intentar editar/eliminar una habitación de otro hotel responde `404` (no se filtra su existencia).
@@ -166,7 +186,7 @@ Requeridos: `descripcion`, `tipo_bano`, `tamano_cama` (strings no vacíos), `cap
 
 **`PUT /hotel/habitaciones/:id`** — edita (acepta cualquier subconjunto de los campos de arriba, actualiza solo lo enviado). Respuesta `200` con la habitación actualizada.
 
-**`DELETE /hotel/habitaciones/:id`** — elimina. Respuesta `204` sin body.
+**`DELETE /hotel/habitaciones/:id`** — elimina. Respuesta `204` sin body. **Efecto secundario**: si tras eliminarla el hotel queda con menos de 4 habitaciones y estaba `activo`, se desactiva automáticamente en la misma transacción (ver "Regla de visibilidad" más abajo). El body de la respuesta sigue sin incluir esa información — el frontend la ve al volver a pedir `GET /hotel/me`.
 
 ### Activación — regla de negocio (SPEC.md sección 3)
 
@@ -191,7 +211,7 @@ Siempre permitido, sin condición de habitaciones. Respuesta `200`: `{ "activo":
 
 ### `GET /public/hoteles`
 
-Lista los hoteles **activos**, orden alfabético por `nombre` (case-insensitive). Filtros opcionales por querystring, combinables:
+Lista los hoteles que cumplen la **regla de visibilidad completa** de SPEC.md sección 3 — `activo = 1` **Y** `>= 4` habitaciones cargadas, evaluadas ambas en cada request (el conteo de habitaciones se recalcula en vivo con una subquery, no se confía en que `activo` esté siempre sincronizado — ver "Regla de visibilidad" más abajo). Orden alfabético por `nombre` (case-insensitive). Filtros opcionales por querystring, combinables:
 
 | Query param | Tipo | Ejemplo |
 |---|---|---|
@@ -210,6 +230,15 @@ Respuesta `200`:
 }
 ```
 `precio_min`/`precio_max` no numéricos responden `400`.
+
+#### Regla de visibilidad (dos capas, independientes entre sí)
+
+Un hotel con menos de 4 habitaciones nunca debería ser visible en el home, aunque quede `activo = 1` por algún camino no controlado. Esto se protege en dos capas:
+
+1. **Auto-desactivación al eliminar una habitación** — `DELETE /hotel/habitaciones/:id` revisa el conteo después de borrar, dentro de la misma transacción: si queda por debajo de 4 y el hotel estaba activo, lo desactiva (`activo = 0`).
+2. **Filtro por conteo en la propia query pública** — `GET /public/hoteles` nunca confía solo en el flag `activo`; siempre re-cuenta habitaciones con una subquery correlacionada (`>= 4`) en el mismo `WHERE`. Esta capa es independiente de la primera: aunque `activo` quedara en `1` por cualquier otra vía (un bug futuro, una edición manual en la base de datos, etc.), el hotel igual no aparecería en el listado público sin las 4 habitaciones.
+
+Las dos capas comparten la misma constante `MIN_HABITACIONES` (definida una sola vez en `hotelEstado.controller.js` e importada donde hace falta), para que el mínimo nunca pueda quedar desincronizado entre `/hotel/activar`, la eliminación de habitaciones, y el listado público.
 
 ### `GET /public/destinos`
 
@@ -470,6 +499,7 @@ Respuesta `200`:
 | POST | `/auth/hotel/forgot-password` | — | Solicitar reset de contraseña |
 | POST | `/auth/hotel/reset-password` | — | Confirmar reset de contraseña |
 | GET | `/hotel/me` | hotel | Perfil propio + estado de activación |
+| PUT | `/hotel/me` | hotel | Editar datos generales propios |
 | GET | `/hotel/habitaciones` | hotel | Listar habitaciones propias |
 | POST | `/hotel/habitaciones` | hotel | Crear habitación |
 | PUT | `/hotel/habitaciones/:id` | hotel | Editar habitación propia |
@@ -502,9 +532,12 @@ Respuesta `200`:
 
 ## Pendiente para próximas fases
 
-- Endpoints para editar datos generales del hotel (7.1) después del registro inicial
 - Subida de archivos (logo, fotos de habitaciones) — hoy `logo_url`/`fotos`/imágenes de banner son solo strings/URLs
 - Envío real de correo para recuperación de contraseña y para el formulario de contacto
 - Conectar `destinosRefresh.js` a una fuente externa real (hoy genera contenido simulado)
 - Perfil público detallado por hotel (`/[slug]`) — el frontend ya tiene la ruta, pero la página es un placeholder
-- Frontend: Registro, Login, Destinos, Contacto, y los paneles de hotel/super admin (hoy solo el Home está construido)
+- Frontend: Destinos, Contacto, panel de super admin (hoy solo Home, Registro/Login/recuperación y el panel de hotel están construidos)
+
+## Corregido: `activo` vs. cantidad de habitaciones (ver "Regla de visibilidad" en la sección 3)
+
+Se detectó durante la Fase 7 que un hotel activo que eliminaba una habitación y quedaba por debajo de 4 seguía apareciendo en `GET /public/hoteles` — `activo` no se revertía, y el listado público solo filtraba por ese flag. Corregido con dos capas independientes: auto-desactivación al eliminar (`DELETE /hotel/habitaciones/:id`) + un filtro por conteo de habitaciones directamente en la query de `GET /public/hoteles`, que no depende de que `activo` esté sincronizado. Ver el detalle en la sección 3.
