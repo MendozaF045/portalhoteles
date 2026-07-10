@@ -1,0 +1,286 @@
+# API.md — PortalHoteles.com (Fase 2)
+
+Documentación de los endpoints REST del backend, pensada para probarse con Postman (o cualquier cliente HTTP) sin pasar por la UI. Ver [SPEC.md](./SPEC.md) para las reglas de negocio completas.
+
+## Base URL
+
+```
+http://localhost:3001/api
+```
+
+## Puesta en marcha rápida
+
+```bash
+cd backend
+npm install
+cp .env.example .env      # y ajusta JWT_SECRET / SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD
+npm run db:init            # crea el archivo SQLite con el esquema
+npm run seed:admin         # crea la cuenta de super admin a partir de las vars de entorno
+npm run dev                # levanta el servidor en http://localhost:3001
+```
+
+## Autenticación
+
+Todos los endpoints protegidos usan JWT enviado en el header:
+
+```
+Authorization: Bearer <token>
+```
+
+Hay dos "roles" de token, no intercambiables entre sí:
+
+| Rol | Se obtiene en | Da acceso a |
+|---|---|---|
+| `hotel` | `POST /auth/hotel/login` o `/auth/hotel/registro` | `/hotel/*` |
+| `super_admin` | `POST /auth/admin/login` | `/admin/*` |
+
+Un token de hotel usado contra una ruta `/admin/*` (o viceversa) responde `403`. Una ruta protegida sin token, o con token inválido/expirado, responde `401`.
+
+## Formato de errores
+
+Todos los errores devuelven `{ "error": "mensaje" }` con el status code correspondiente:
+
+| Código | Significado |
+|---|---|
+| 400 | Body/query inválido (campo faltante, tipo incorrecto, regla de negocio no cumplida) |
+| 401 | Falta token, token inválido/expirado, o credenciales incorrectas |
+| 403 | Token válido pero rol incorrecto para el recurso |
+| 404 | Recurso no encontrado (o no pertenece al hotel autenticado) |
+| 409 | Conflicto (email ya registrado) |
+
+---
+
+## 1. Auth de hotel — `/auth/hotel`
+
+### `POST /auth/hotel/registro`
+
+Crea la cuenta de usuario **y** el hotel en un solo paso.
+
+Body:
+```json
+{
+  "nombre": "Hotel Faraon",
+  "pais": "Egipto",
+  "ciudad": "Giza",
+  "email": "faraon@example.com",
+  "password": "secret123",
+  "descripcion": "Un hotel junto a las piramides",
+  "website_url": "https://hotelfaraon.example",
+  "whatsapp_numero": "+201234567890",
+  "logo_url": "https://.../logo.png",
+  "precio_referencia": 120
+}
+```
+
+Requeridos: `nombre`, `pais`, `ciudad`, `email` (formato válido), `password` (mínimo 6 caracteres). El resto es opcional.
+
+Respuesta `201`:
+```json
+{
+  "token": "<jwt>",
+  "hotel": {
+    "id": 1, "slug": "hotel-faraon", "nombre": "Hotel Faraon",
+    "logo_url": null, "pais": "Egipto", "ciudad": "Giza",
+    "descripcion": "...", "website_url": "...", "whatsapp_numero": "...",
+    "precio_referencia": 120, "activo": false, "created_at": "..."
+  }
+}
+```
+
+El `slug` se genera automáticamente a partir de `nombre` (minúsculas, sin acentos, espacios → `-`) y es único; si colisiona se le agrega un sufijo `-2`, `-3`, etc.
+
+Errores: `400` (campos faltantes/inválidos), `409` (email ya registrado).
+
+### `POST /auth/hotel/login`
+
+Body: `{ "email": "...", "password": "..." }`
+Respuesta `200`: igual forma que el registro (`token` + `hotel`).
+Errores: `400` (faltan campos), `401` (credenciales inválidas).
+
+### `POST /auth/hotel/forgot-password`
+
+Body: `{ "email": "..." }`
+
+Siempre responde `200` con un mensaje genérico, exista o no el email (para no filtrar qué emails están registrados):
+```json
+{ "message": "Si el email existe, se enviaran instrucciones para restablecer la contrasena" }
+```
+
+**Nota de desarrollo**: como todavía no hay servicio de envío de correo, si el email sí existe la respuesta incluye además el token en crudo, solo para poder probar el flujo end-to-end desde Postman:
+```json
+{
+  "message": "...",
+  "dev_note": "No hay servicio de email configurado todavia; el token se devuelve aqui solo para pruebas.",
+  "resetToken": "7e6614e0...",
+  "resetTokenExpiresAt": "2026-07-10T20:36:54.784Z"
+}
+```
+El token expira 1 hora después de generado. Esto deberá reemplazarse por un envío de correo real antes de producción.
+
+### `POST /auth/hotel/reset-password`
+
+Body: `{ "token": "<resetToken>", "password": "nuevaPassword123" }`
+Respuesta `200`: `{ "message": "Contrasena actualizada correctamente" }`
+Errores: `400` (token inválido, ya usado, o expirado; o password < 6 caracteres). El token se invalida después de usarse una vez.
+
+---
+
+## 2. Panel de hotel — `/hotel` (requiere token de rol `hotel`)
+
+### `GET /hotel/me`
+
+Devuelve el perfil del hotel autenticado junto con el estado de la regla de activación.
+
+Respuesta `200`:
+```json
+{
+  "hotel": { "...": "..." },
+  "habitaciones_count": 3,
+  "habitaciones_requeridas": 4,
+  "puede_activarse": false
+}
+```
+
+### Habitaciones — `/hotel/habitaciones`
+
+Todas las operaciones están limitadas a las habitaciones del hotel dueño del token; intentar editar/eliminar una habitación de otro hotel responde `404` (no se filtra su existencia).
+
+**`GET /hotel/habitaciones`** — lista las habitaciones propias.
+```json
+{ "habitaciones": [ { "id": 1, "hotel_id": 1, "descripcion": "...", "tipo_bano": "...", "tamano_cama": "...", "capacidad_huespedes": 2, "precio": 80, "fotos": [], "created_at": "...", "updated_at": "..." } ] }
+```
+
+**`POST /hotel/habitaciones`** — crea una habitación.
+Body:
+```json
+{
+  "descripcion": "Habitacion doble con vista al mar",
+  "tipo_bano": "privado",
+  "tamano_cama": "queen",
+  "capacidad_huespedes": 2,
+  "precio": 80,
+  "fotos": ["https://.../foto1.jpg"]
+}
+```
+Requeridos: `descripcion`, `tipo_bano`, `tamano_cama` (strings no vacíos), `capacidad_huespedes` (entero positivo). Opcionales: `precio` (número ≥ 0), `fotos` (array de URLs). Respuesta `201` con la habitación creada.
+
+**`PUT /hotel/habitaciones/:id`** — edita (acepta cualquier subconjunto de los campos de arriba, actualiza solo lo enviado). Respuesta `200` con la habitación actualizada.
+
+**`DELETE /hotel/habitaciones/:id`** — elimina. Respuesta `204` sin body.
+
+### Activación — regla de negocio (SPEC.md sección 3)
+
+**`POST /hotel/activar`**
+
+Requiere que el hotel tenga **mínimo 4 habitaciones** cargadas. Si no las tiene:
+
+Respuesta `400`:
+```json
+{ "error": "Faltan 1 habitacion(es) para poder activarse (minimo 4)" }
+```
+
+Si cumple la condición, respuesta `200`: `{ "activo": true, "habitaciones_count": 4 }`. Este es el caso límite (boundary) explícito de la spec: probar con exactamente 3 y exactamente 4 habitaciones.
+
+**`POST /hotel/desactivar`**
+
+Siempre permitido, sin condición de habitaciones. Respuesta `200`: `{ "activo": false }`.
+
+---
+
+## 3. Público / Home — `/public` (sin autenticación)
+
+### `GET /public/hoteles`
+
+Lista los hoteles **activos**, orden alfabético por `nombre` (case-insensitive). Filtros opcionales por querystring, combinables:
+
+| Query param | Tipo | Ejemplo |
+|---|---|---|
+| `pais` | string (match exacto) | `?pais=Peru` |
+| `ciudad` | string (match exacto) | `?ciudad=Cusco` |
+| `precio_min` | number | `?precio_min=50` |
+| `precio_max` | number | `?precio_max=150` |
+
+Respuesta `200`:
+```json
+{
+  "hoteles": [
+    { "id": 2, "slug": "aurora-inn", "nombre": "Aurora Inn", "logo_url": null, "pais": "Peru", "ciudad": "Cusco", "precio_referencia": 60 },
+    { "id": 1, "slug": "hotel-faraon", "nombre": "Hotel Faraon", "logo_url": null, "pais": "Egipto", "ciudad": "Giza", "precio_referencia": 120 }
+  ]
+}
+```
+`precio_min`/`precio_max` no numéricos responden `400`.
+
+---
+
+## 4. Auth de super admin — `/auth/admin`
+
+### `POST /auth/admin/login`
+
+Body: `{ "email": "...", "password": "..." }`
+Respuesta `200`: `{ "token": "<jwt>", "admin": { "id": 1, "email": "..." } }`
+Errores: `400`, `401`.
+
+No hay endpoint de registro público para super admin — la cuenta se crea/actualiza corriendo `npm run seed:admin` (lee `SUPER_ADMIN_EMAIL` / `SUPER_ADMIN_PASSWORD` de `.env`) directamente en el servidor. Es intencional: acceso único y exclusivo (SPEC.md sección 9).
+
+---
+
+## 5. Panel super admin — `/admin` (requiere token de rol `super_admin`)
+
+### `GET /admin/hoteles/activos`
+
+Lista todos los hoteles con `activo = 1` (orden alfabético). Incluye todos los campos del hotel (a diferencia del listado público).
+
+### `GET /admin/hoteles/inactivos`
+
+Igual pero `activo = 0`.
+
+### `POST /admin/hoteles`
+
+Agrega un hotel manualmente, sin pasar por `/auth/hotel/registro`.
+
+Body mínimo:
+```json
+{ "nombre": "Hotel Manual", "pais": "Chile", "ciudad": "Santiago" }
+```
+Opcionales: `descripcion`, `website_url`, `whatsapp_numero`, `logo_url`, `precio_referencia`, y opcionalmente `email` + `password` (ambos juntos) si además se quiere dejar credenciales de acceso listas para el hotel. Si se omiten `email`/`password`, el hotel queda sin cuenta de login asociada (se puede vincular más adelante — no hay endpoint para eso todavía).
+
+El hotel creado siempre queda `activo: false`: la activación sigue siendo exclusiva del propio hotel vía `/hotel/activar` (el super admin no puede saltarse esa regla — ver SPEC.md sección 3 y 12, "Roles y permisos").
+
+Respuesta `201` con el hotel creado. Errores: `400`, `409` (si el email ya existe).
+
+### `DELETE /admin/hoteles/:id`
+
+Elimina el hotel (sus habitaciones se eliminan en cascada) y, si tenía cuenta de login asociada, también la elimina. Respuesta `204`. `404` si el id no existe.
+
+---
+
+## Resumen de endpoints
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| POST | `/auth/hotel/registro` | — | Registro de hotel + cuenta |
+| POST | `/auth/hotel/login` | — | Login de hotel |
+| POST | `/auth/hotel/forgot-password` | — | Solicitar reset de contraseña |
+| POST | `/auth/hotel/reset-password` | — | Confirmar reset de contraseña |
+| GET | `/hotel/me` | hotel | Perfil propio + estado de activación |
+| GET | `/hotel/habitaciones` | hotel | Listar habitaciones propias |
+| POST | `/hotel/habitaciones` | hotel | Crear habitación |
+| PUT | `/hotel/habitaciones/:id` | hotel | Editar habitación propia |
+| DELETE | `/hotel/habitaciones/:id` | hotel | Eliminar habitación propia |
+| POST | `/hotel/activar` | hotel | Activar (requiere ≥4 habitaciones) |
+| POST | `/hotel/desactivar` | hotel | Desactivar |
+| GET | `/public/hoteles` | — | Listado de hoteles activos con filtros |
+| POST | `/auth/admin/login` | — | Login de super admin |
+| GET | `/admin/hoteles/activos` | super_admin | Listado completo de hoteles activos |
+| GET | `/admin/hoteles/inactivos` | super_admin | Listado completo de hoteles inactivos |
+| POST | `/admin/hoteles` | super_admin | Agregar hotel manualmente |
+| DELETE | `/admin/hoteles/:id` | super_admin | Eliminar hotel |
+| GET | `/health` | — | Chequeo de salud del servidor |
+
+## Pendiente para próximas fases
+
+- Endpoints para editar datos generales del hotel (7.1) después del registro inicial
+- Subida de archivos (logo, fotos de habitaciones) — hoy `logo_url`/`fotos` son solo strings/URLs
+- Envío real de correo para recuperación de contraseña
+- Endpoints de `/destinos`, `/contacto`, banner destacado (sección 9.1) y perfil público detallado por hotel (`/[slug]`)

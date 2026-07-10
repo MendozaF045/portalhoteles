@@ -4,9 +4,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-This repository currently contains only `SPEC.md` — no code has been written yet. There is no build, lint, or test tooling to run. **Read `SPEC.md` in full before writing any code**; it is the source of truth for scope, and any change of scope must be reflected there first, per the doc's own instructions.
+Phase 1 (folder structure, Express skeleton, SQLite schema) and Phase 2 (REST endpoints) are done — see `README.md` for phase status and `API.md` for full endpoint docs. No frontend yet. **Read `SPEC.md` in full before writing any code**; it is the source of truth for scope, and any change of scope must be reflected there first, per the doc's own instructions.
 
-Once code exists, this file should be updated with real build/lint/test commands and actual architecture (module boundaries, data flow) discovered by reading the code — not duplicated from the spec below.
+There is no test suite or linter configured yet — verification so far has been manual (curl/Postman flows against a running server). If you add a test runner or linter, record the actual commands here.
+
+## Commands
+
+```bash
+cd backend
+npm install
+cp .env.example .env       # set JWT_SECRET / SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD
+npm run db:init             # (re)creates the SQLite schema, idempotent
+npm run seed:admin          # creates/updates the super_admin row from .env
+npm run dev                 # node --watch src/server.js
+npm start
+```
+
+## Backend architecture
+
+Layout: `backend/src/{config,db,routes,controllers,middleware,utils}`. Routes are thin — they wire `requireAuth`/`requireRole` + `asyncHandler` around controller functions; business logic and SQL live in the controllers.
+
+- **Auth**: single JWT secret (`JWT_SECRET`, falls back to an insecure dev default with a console warning if unset), two non-interchangeable token roles baked into the payload — `{ role: 'hotel', hotelId, usuarioId }` and `{ role: 'super_admin', adminId }`. `middleware/auth.middleware.js` exports `requireAuth` (verifies the token) and `requireRole(role)` (checks the payload's role); a hotel token against an admin route (or vice versa) is a `403`, not a `401`.
+- **Route prefixes**: `/api/auth/hotel`, `/api/auth/admin` (public — login/registro/reset), `/api/hotel/*` (role `hotel`), `/api/admin/*` (role `super_admin`), `/api/public/*` (no auth).
+- **Ownership checks**: habitaciones are scoped to `req.auth.hotelId`; updating/deleting a room belonging to another hotel returns `404` (not `403`) to avoid leaking existence — see `getOwnedOrThrow` in `habitaciones.controller.js`.
+- **Activation rule** lives in `hotelEstado.controller.js` (`MIN_HABITACIONES = 4`), computed live via `COUNT(*) FROM habitaciones` rather than a stored counter — there is deliberately no `cantidad_habitaciones` column on `hoteles`. Don't add one; it would risk drifting out of sync.
+- **better-sqlite3 is synchronous** — writes that need both a password hash and a DB insert (registro, admin's manual-add-with-login) hash the password *before* opening a `db.transaction(...)` callback, since the callback itself must be sync. Follow this pattern for any new multi-step write.
+- **Error handling**: throw `HttpError(status, message)` from `utils/httpError.js` inside any handler wrapped in `asyncHandler`; the central `errorHandler` middleware in `middleware/errorHandler.js` turns it into `{ error: message }` with that status.
+- **Password reset** (`authHotel.controller.js`): `forgot-password` always returns a generic 200 regardless of whether the email exists (no user enumeration), but — since there's no email service yet — includes the raw reset token in the JSON response when the account does exist, clearly marked `dev_note`. Replace this with real email delivery before anything resembling production use.
+- **Super admin has no public registration endpoint** by design (spec: "acceso único y exclusivo"). The account is created/rotated via `npm run seed:admin` (`src/db/seedAdmin.js`), reading `SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD` from `.env`.
+- **Admin-added hotels still start `activo: 0`**: the super admin's `POST /admin/hoteles` cannot bypass the activation rule — only the hotel's own `/hotel/activar` can flip that flag. Don't add an admin override; it's an explicit roles/permissions QA boundary (spec section 12).
 
 ## What this project is
 

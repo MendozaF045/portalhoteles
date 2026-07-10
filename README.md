@@ -2,9 +2,9 @@
 
 Plataforma tipo directorio/marketplace de hoteles. Ver [SPEC.md](./SPEC.md) para la especificación completa del proyecto.
 
-## Estado actual: Fase 1
+## Estado actual: Fase 2
 
-Esta fase entrega solo la base: estructura de carpetas, backend con Express y la base de datos SQLite con su esquema. Todavía no hay frontend ni endpoints de API para hoteles/habitaciones/etc. — eso se construye en las fases siguientes.
+Fase 1 entregó la base (estructura, Express, esquema SQLite). Fase 2 agrega los endpoints REST del backend: auth de hotel (JWT), CRUD de habitaciones, activar/desactivar, listado público con filtros, y auth + gestión de super admin. Ver [API.md](./API.md) para el detalle de cada endpoint (pensado para probarse con Postman). Todavía no hay frontend.
 
 ## Estructura
 
@@ -12,13 +12,14 @@ Esta fase entrega solo la base: estructura de carpetas, backend con Express y la
 .
 ├── backend/          # API Node.js + Express + SQLite
 │   ├── src/
-│   │   ├── config/    # conexión a la base de datos
-│   │   ├── db/        # esquema SQL y script de inicialización
-│   │   ├── routes/     )  vacíos por ahora,
-│   │   ├── controllers/ ) se llenan en próximas fases
-│   │   ├── middleware/  )
-│   │   └── server.js  # punto de entrada de Express
-│   ├── uploads/       # imágenes subidas (logos, fotos de habitaciones)
+│   │   ├── config/       # conexión a la base de datos
+│   │   ├── db/           # esquema SQL, init y seed del super admin
+│   │   ├── routes/       # definición de rutas Express por área
+│   │   ├── controllers/  # lógica de cada endpoint
+│   │   ├── middleware/   # auth (JWT), asyncHandler, error handler
+│   │   ├── utils/        # jwt, password, slug, validación, HttpError
+│   │   └── server.js     # punto de entrada de Express
+│   ├── uploads/       # imágenes subidas (logos, fotos de habitaciones) — aún sin endpoint de upload
 │   └── data/          # archivo SQLite (generado, no versionado)
 └── frontend/          # (vacío — se construye en una fase posterior)
 ```
@@ -40,12 +41,13 @@ cp .env.example .env
 ### Comandos
 
 ```bash
-npm run db:init   # crea/actualiza el archivo SQLite ejecutando src/db/schema.sql
-npm run dev        # arranca el servidor con recarga automática (node --watch)
-npm start          # arranca el servidor
+npm run db:init      # crea/actualiza el archivo SQLite ejecutando src/db/schema.sql
+npm run seed:admin   # crea/actualiza la cuenta de super admin (usa SUPER_ADMIN_EMAIL/PASSWORD de .env)
+npm run dev          # arranca el servidor con recarga automática (node --watch)
+npm start            # arranca el servidor
 ```
 
-El servidor expone `GET /api/health` como chequeo de estado. Por defecto corre en `http://localhost:3001` (configurable con `PORT` en `.env`).
+El servidor expone `GET /api/health` como chequeo de estado. Por defecto corre en `http://localhost:3001` (configurable con `PORT` en `.env`). Ver [API.md](./API.md) para todos los demás endpoints.
 
 ### Base de datos
 
@@ -63,6 +65,7 @@ Tablas:
 
 ## Próximas fases
 
-- Endpoints REST (auth, CRUD de hoteles/habitaciones, panel admin)
 - Frontend en React
-- Lógica de activación (regla de mínimo 4 habitaciones) y roles/permisos
+- Subida de archivos (logo, fotos de habitaciones)
+- Envío real de correo para recuperación de contraseña
+- Endpoints de `/destinos`, `/contacto`, banner destacado, perfil público por hotel
