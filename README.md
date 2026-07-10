@@ -2,9 +2,9 @@
 
 Plataforma tipo directorio/marketplace de hoteles. Ver [SPEC.md](./SPEC.md) para la especificación completa del proyecto.
 
-## Estado actual: Fase 5
+## Estado actual: Fase 6
 
-Fase 1 entregó la base (estructura, Express, esquema SQLite). Fase 2 agregó los endpoints REST principales: auth de hotel (JWT), CRUD de habitaciones, activar/desactivar, listado público con filtros, y auth + gestión de super admin. Fase 3 sumó los endpoints de Destinos y un refresh de cache simulado. Fase 4 agregó el link de reserva a WhatsApp y el formulario de contacto general. Fase 5 arranca el frontend en React (Vite): Home público completo (header, banner destacado con carrusel, listado de hoteles con filtros, footer) con tema oscuro/claro; también sumó al backend el CRUD del banner destacado (sección 9.1 de la spec) que el Home necesitaba consumir. Ver [API.md](./API.md) para el detalle de cada endpoint. El resto de las páginas del frontend (Registro, Login, Destinos, Contacto, paneles) son placeholders por ahora.
+Fase 1 entregó la base (estructura, Express, esquema SQLite). Fase 2 agregó los endpoints REST principales: auth de hotel (JWT), CRUD de habitaciones, activar/desactivar, listado público con filtros, y auth + gestión de super admin. Fase 3 sumó los endpoints de Destinos y un refresh de cache simulado. Fase 4 agregó el link de reserva a WhatsApp y el formulario de contacto general. Fase 5 arrancó el frontend en React (Vite) con el Home público completo, y sumó al backend el CRUD del banner destacado que el Home necesitaba consumir. Fase 6 conecta Registro, Login, y recuperación/restablecimiento de contraseña del hotel al frontend, con sesión persistida y una ruta protegida `/panel-hotel` (placeholder por ahora — el panel real es la próxima fase). Ver [API.md](./API.md) para el detalle de cada endpoint. Destinos, Contacto, y los paneles de admin siguen siendo placeholders.
 
 ## Estructura
 
@@ -25,11 +25,12 @@ Fase 1 entregó la base (estructura, Express, esquema SQLite). Fase 2 agregó lo
 └── frontend/           # React + Vite
     └── src/
         ├── api/           # cliente fetch hacia el backend
-        ├── context/       # ThemeContext (modo oscuro/claro)
-        ├── components/    # Header, Footer, Layout, BannerCarousel, HotelCard, HotelFilters, HotelList
-        ├── pages/         # Home (completo) + placeholders (Destinos, Contacto, Registro, Login, perfil de hotel)
-        ├── styles/        # global.css (variables de color, tipografías, layout)
-        └── utils/         # countryFlags (nombre de país -> emoji de bandera)
+        ├── context/       # ThemeContext (modo oscuro/claro), AuthContext (sesión de hotel)
+        ├── components/    # Header, Footer, Layout, BannerCarousel, HotelCard, HotelFilters, HotelList, FormField, PrivateRoute
+        ├── pages/         # Home, Registro, Login, RecuperarPassword, RestablecerPassword (completos)
+        │                  # + placeholders (Destinos, Contacto, PanelHotel, perfil de hotel)
+        ├── styles/        # global.css (variables de color, tipografías, layout, formularios)
+        └── utils/         # countryFlags (nombre de país -> emoji de bandera), validators (email)
 ```
 
 ## Backend
@@ -104,11 +105,15 @@ Como el nombre del país se guarda como texto libre (no hay código ISO en el ba
 
 ### Estado
 
-Solo el Home (`/`) está construido de punta a punta: header con navegación y toggle de tema, banner destacado (carrusel, consume `GET /api/public/banner`), listado de hoteles con filtros de país/ciudad/precio (consume `GET /api/public/hoteles`), y footer. Las rutas `/destinos`, `/contacto`, `/registro`, `/login` y `/:slug` (perfil de hotel) ya existen para que la navegación del header no rompa, pero muestran una página "Próximamente" — se implementan en fases posteriores.
+Home (`/`), Registro (`/registro`), Login (`/login`), y recuperación/restablecimiento de contraseña (`/recuperar-password`, `/restablecer-password`) están construidos de punta a punta contra el backend real. La sesión (token + datos del hotel) se guarda en `localStorage` vía `AuthContext` y sobrevive a un refresh de página. `/panel-hotel` es una ruta protegida (`PrivateRoute` redirige a `/login` si no hay sesión) que hoy solo muestra un placeholder con botón de cerrar sesión — el panel real es la Fase 7.
+
+`/destinos`, `/contacto` y `/:slug` (perfil de hotel) siguen mostrando "Próximamente".
+
+**Nota sobre recuperación de contraseña**: como el backend todavía no envía emails reales (ver `dev_note` en la respuesta de `forgot-password`), la página `/recuperar-password` muestra el token de desarrollo directamente en pantalla con un botón para continuar — es un atajo intencional para poder probar el flujo completo sin Postman ni servidor de correo; hay que reemplazarlo cuando se conecte un servicio de email real.
 
 ## Próximas fases
 
-- Frontend: Registro, Login, Destinos, Contacto, perfil público de hotel, panel de hotel, panel de super admin (incluyendo la UI para gestionar el banner)
+- Frontend: panel real de hotel (datos generales, habitaciones, activar/desactivar), Destinos, Contacto, perfil público de hotel, panel de super admin (incluyendo la UI para gestionar el banner)
 - Subida de archivos (logo, fotos de habitaciones, imágenes de banner)
 - Envío real de correo para recuperación de contraseña y para el formulario de contacto
 - Conectar el refresh de Destinos a una fuente externa real (hoy es simulado)

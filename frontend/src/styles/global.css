@@ -523,3 +523,134 @@ select {
   font-weight: 600;
   color: var(--color-accent);
 }
+
+/* Forms (Registro, Login, recuperar/restablecer password) */
+
+.form-page {
+  padding: 3rem 1.25rem;
+  display: flex;
+  justify-content: center;
+}
+
+.form-card {
+  width: 100%;
+  max-width: 30rem;
+  padding: 2rem;
+}
+
+.form-card h1 {
+  font-size: 1.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.form-page__intro {
+  color: var(--color-text-muted);
+  margin-bottom: 1.5rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 480px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1.1rem;
+}
+
+.form-field label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.form-field input,
+.form-field textarea,
+.form-field select {
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  width: 100%;
+}
+
+.form-field input:focus,
+.form-field textarea:focus,
+.form-field select:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.form-field input[aria-invalid='true'],
+.form-field textarea[aria-invalid='true'] {
+  border-color: #d97a5f;
+}
+
+.form-field textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.form-field__error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #d97a5f;
+}
+
+.form-page__submit {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.form-page__footer-link {
+  text-align: center;
+  margin: 1rem 0 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.form-banner {
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.9rem;
+}
+
+.form-banner p {
+  margin: 0 0 0.4rem;
+}
+
+.form-banner p:last-child {
+  margin-bottom: 0;
+}
+
+.form-banner--error {
+  background-color: rgba(217, 122, 95, 0.12);
+  border: 1px solid rgba(217, 122, 95, 0.4);
+  color: #d97a5f;
+}
+
+.form-banner--success {
+  background-color: rgba(201, 162, 75, 0.12);
+  border: 1px solid rgba(201, 162, 75, 0.4);
+}
+
+.form-banner__dev-note {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.form-banner--success .btn {
+  margin-top: 0.5rem;
+}

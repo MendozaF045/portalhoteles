@@ -29,3 +29,19 @@ export function getHoteles(filtros = {}) {
 export function getBannerActivo() {
   return request('/public/banner');
 }
+
+export function registrarHotel(datos) {
+  return request('/auth/hotel/registro', { method: 'POST', body: JSON.stringify(datos) });
+}
+
+export function loginHotel(credenciales) {
+  return request('/auth/hotel/login', { method: 'POST', body: JSON.stringify(credenciales) });
+}
+
+export function forgotPasswordHotel(datos) {
+  return request('/auth/hotel/forgot-password', { method: 'POST', body: JSON.stringify(datos) });
+}
+
+export function resetPasswordHotel(datos) {
+  return request('/auth/hotel/reset-password', { method: 'POST', body: JSON.stringify(datos) });
+}
