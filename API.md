@@ -1,4 +1,4 @@
-# API.md — PortalHoteles.com (Fases 2 a 4)
+# API.md — PortalHoteles.com (Fases 2 a 5)
 
 Documentación de los endpoints REST del backend, pensada para probarse con Postman (o cualquier cliente HTTP) sin pasar por la UI. Ver [SPEC.md](./SPEC.md) para las reglas de negocio completas.
 
@@ -271,6 +271,24 @@ Respuesta `200`:
 ```
 `whatsapp_numero` se normaliza a solo dígitos (se aceptan `+`, espacios y guiones al cargarlo en el perfil del hotel) antes de armar la URL `wa.me`, como pide el formato de esa API.
 
+### `GET /public/banner`
+
+Banner destacado del home (SPEC.md sección 9.1). Devuelve el único banner con `activo = 1`, o `null` si el Super Admin no tiene ninguno activo en este momento (no es automático, lo decide el Super Admin).
+
+Respuesta `200`:
+```json
+{
+  "banner": {
+    "id": 1,
+    "titulo": "Hotel Faraon: descubre Giza",
+    "descripcion": "Vive la experiencia junto a las piramides",
+    "link": "/hotel-faraon",
+    "imagenes": ["https://.../1.jpg", "https://.../2.jpg"]
+  }
+}
+```
+o `{ "banner": null }`. No incluye `activo` (siempre es implícitamente el activo) ni timestamps — son detalle de gestión interna.
+
 ---
 
 ## 4. Auth de super admin — `/auth/admin`
@@ -312,6 +330,32 @@ Respuesta `201` con el hotel creado. Errores: `400`, `409` (si el email ya exist
 ### `DELETE /admin/hoteles/:id`
 
 Elimina el hotel (sus habitaciones se eliminan en cascada) y, si tenía cuenta de login asociada, también la elimina. Respuesta `204`. `404` si el id no existe.
+
+### Banner destacado — `/admin/banners` (SPEC.md sección 9.1)
+
+Gestión del banner del home. **Solo puede haber un banner `activo` a la vez** — activar uno desactiva automáticamente cualquier otro (no hace falta desactivarlo a mano primero). No es automático: el Super Admin decide manualmente cuál mostrar, y también puede dejar el home sin ningún banner.
+
+**`GET /admin/banners`** — lista todos los banners (activos o no), con sus imágenes y timestamps.
+
+**`POST /admin/banners`** — crea un banner (queda `activo: false` hasta que se active explícitamente).
+Body:
+```json
+{
+  "titulo": "Hotel Faraon: descubre Giza",
+  "descripcion": "Vive la experiencia junto a las piramides",
+  "link": "/hotel-faraon",
+  "imagenes": ["https://.../1.jpg", "https://.../2.jpg"]
+}
+```
+Requeridos: `titulo`, `link` (strings no vacíos — `link` normalmente es la ruta al perfil público del hotel, ej. `/hotelfaraon`, pero acepta cualquier string no vacío), `imagenes` (array con al menos 1 URL `http(s)` válida). Opcional: `descripcion`. Respuesta `201`.
+
+**`PUT /admin/banners/:id`** — edita (acepta cualquier subconjunto de los campos de arriba). Si se envía `imagenes`, **reemplaza toda la galería** (no hay endpoint para agregar/quitar una imagen individual). No cambia `activo` — para eso usar los endpoints de abajo. Respuesta `200`. Errores: `400`, `404`.
+
+**`DELETE /admin/banners/:id`** — elimina el banner (sus imágenes se eliminan en cascada). Respuesta `204`. `404` si no existe.
+
+**`POST /admin/banners/:id/activar`** — activa este banner y desactiva cualquier otro que estuviera activo, en una sola operación atómica. Respuesta `200` con el banner actualizado. `404` si no existe.
+
+**`POST /admin/banners/:id/desactivar`** — desactiva este banner (el home queda sin banner destacado hasta que se active otro). Respuesta `200`. `404` si no existe.
 
 ### Destinos — `/admin/destinos` (SPEC.md sección 4)
 
@@ -434,6 +478,7 @@ Respuesta `200`:
 | POST | `/hotel/desactivar` | hotel | Desactivar |
 | GET | `/public/hoteles` | — | Listado de hoteles activos con filtros |
 | GET | `/public/destinos` | — | Listado de destinos con filtros |
+| GET | `/public/banner` | — | Banner destacado activo (o null) |
 | POST | `/public/hoteles/:slug/reservas` | — | Generar link de reserva a WhatsApp |
 | POST | `/contacto` | — | Enviar mensaje de contacto general |
 | POST | `/auth/admin/login` | — | Login de super admin |
@@ -441,6 +486,12 @@ Respuesta `200`:
 | GET | `/admin/hoteles/inactivos` | super_admin | Listado completo de hoteles inactivos |
 | POST | `/admin/hoteles` | super_admin | Agregar hotel manualmente |
 | DELETE | `/admin/hoteles/:id` | super_admin | Eliminar hotel |
+| GET | `/admin/banners` | super_admin | Listar todos los banners |
+| POST | `/admin/banners` | super_admin | Crear banner |
+| PUT | `/admin/banners/:id` | super_admin | Editar banner (y/o reemplazar imágenes) |
+| DELETE | `/admin/banners/:id` | super_admin | Eliminar banner |
+| POST | `/admin/banners/:id/activar` | super_admin | Activar banner (desactiva cualquier otro) |
+| POST | `/admin/banners/:id/desactivar` | super_admin | Desactivar banner |
 | GET | `/admin/destinos` | super_admin | Listar todas las entradas de destinos |
 | POST | `/admin/destinos` | super_admin | Crear entrada de destino manual |
 | PUT | `/admin/destinos/:id` | super_admin | Editar entrada de destino |
@@ -452,7 +503,8 @@ Respuesta `200`:
 ## Pendiente para próximas fases
 
 - Endpoints para editar datos generales del hotel (7.1) después del registro inicial
-- Subida de archivos (logo, fotos de habitaciones) — hoy `logo_url`/`fotos` son solo strings/URLs
+- Subida de archivos (logo, fotos de habitaciones) — hoy `logo_url`/`fotos`/imágenes de banner son solo strings/URLs
 - Envío real de correo para recuperación de contraseña y para el formulario de contacto
 - Conectar `destinosRefresh.js` a una fuente externa real (hoy genera contenido simulado)
-- Banner destacado (sección 9.1) y perfil público detallado por hotel (`/[slug]`)
+- Perfil público detallado por hotel (`/[slug]`) — el frontend ya tiene la ruta, pero la página es un placeholder
+- Frontend: Registro, Login, Destinos, Contacto, y los paneles de hotel/super admin (hoy solo el Home está construido)

@@ -7,6 +7,7 @@ const router = express.Router();
 
 router.get('/hoteles', asyncHandler(ctrl.listHoteles));
 router.get('/destinos', asyncHandler(ctrl.listDestinos));
+router.get('/banner', asyncHandler(ctrl.getBannerActivo));
 router.post('/hoteles/:slug/reservas', asyncHandler(reservasCtrl.crearReserva));
 
 module.exports = router;

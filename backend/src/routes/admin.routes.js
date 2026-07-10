@@ -4,6 +4,7 @@ const { requireAuth, requireRole } = require('../middleware/auth.middleware');
 const ctrl = require('../controllers/admin.controller');
 const destinosCtrl = require('../controllers/adminDestinos.controller');
 const contactoCtrl = require('../controllers/contacto.controller');
+const bannerCtrl = require('../controllers/adminBanner.controller');
 
 const router = express.Router();
 
@@ -21,5 +22,12 @@ router.delete('/destinos/:id', asyncHandler(destinosCtrl.remove));
 router.post('/destinos/refresh', asyncHandler(destinosCtrl.refresh));
 
 router.get('/contactos', asyncHandler(contactoCtrl.list));
+
+router.get('/banners', asyncHandler(bannerCtrl.list));
+router.post('/banners', asyncHandler(bannerCtrl.create));
+router.put('/banners/:id', asyncHandler(bannerCtrl.update));
+router.delete('/banners/:id', asyncHandler(bannerCtrl.remove));
+router.post('/banners/:id/activar', asyncHandler(bannerCtrl.activar));
+router.post('/banners/:id/desactivar', asyncHandler(bannerCtrl.desactivar));
 
 module.exports = router;

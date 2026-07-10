@@ -88,3 +88,26 @@ CREATE TABLE IF NOT EXISTS contactos (
   mensaje     TEXT NOT NULL,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Banner destacado del home. Solo el Super Admin lo gestiona (seccion 9.1); nunca lo elige el hotel.
+-- Solo puede haber un banner con activo = 1 a la vez (se aplica en la capa de aplicacion, no con un
+-- indice parcial, para mantener el esquema compatible con SQLite mas simple).
+CREATE TABLE IF NOT EXISTS banner_destacado (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  titulo      TEXT NOT NULL,
+  descripcion TEXT,
+  link        TEXT NOT NULL,            -- normalmente el perfil publico de un hotel, ej. /hotelfaraon
+  activo      INTEGER NOT NULL DEFAULT 0 CHECK (activo IN (0, 1)),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Galeria de imagenes del carrusel de cada banner.
+CREATE TABLE IF NOT EXISTS banner_imagenes (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  banner_id   INTEGER NOT NULL REFERENCES banner_destacado(id) ON DELETE CASCADE,
+  url         TEXT NOT NULL,
+  orden       INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_banner_imagenes_banner_id ON banner_imagenes(banner_id);

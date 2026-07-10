@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Phase 1 (folder structure, Express skeleton, SQLite schema), Phase 2 (core REST endpoints), Phase 3 (Destinos endpoints + simulated cache refresh), and Phase 4 (WhatsApp reservation link + general contact form) are done — see `README.md` for phase status and `API.md` for full endpoint docs. No frontend yet. **Read `SPEC.md` in full before writing any code**; it is the source of truth for scope, and any change of scope must be reflected there first, per the doc's own instructions.
+Phase 1 (folder structure, Express skeleton, SQLite schema), Phase 2 (core REST endpoints), Phase 3 (Destinos endpoints + simulated cache refresh), Phase 4 (WhatsApp reservation link + general contact form), and Phase 5 (frontend scaffold + public Home, plus the banner destacado backend it needed) are done — see `README.md` for phase status and `API.md` for full endpoint docs. Only the Home page is built on the frontend; everything else (Registro, Login, Destinos, Contacto, hotel panel, admin panel) is a routed placeholder. **Read `SPEC.md` in full before writing any code**; it is the source of truth for scope, and any change of scope must be reflected there first, per the doc's own instructions.
 
 There is no test suite or linter configured yet — verification so far has been manual (curl/Postman flows against a running server). If you add a test runner or linter, record the actual commands here.
 
@@ -20,6 +20,16 @@ npm run destinos:refresh    # simulated Destinos cache refresh (see below)
 npm run dev                 # node --watch src/server.js
 npm start
 ```
+
+```bash
+cd frontend
+npm install
+cp .env.example .env       # VITE_API_URL defaults to http://localhost:3001/api
+npm run dev                 # Vite dev server on http://localhost:5173 (needs the backend running)
+npm run build                # production build to frontend/dist
+```
+
+No test runner or linter is configured on either side yet. Frontend verification so far: `npm run build` (catches syntax/import errors) + manually checking API response shapes against what the components expect. There's no headless-browser tooling in this environment (no `chromium-cli`) — nobody has visually screenshotted the rendered UI yet. If you touch frontend UI code, actually open `http://localhost:5173` (or get the user to) before calling it done; don't rely on the build passing as proof it renders correctly.
 
 ## Backend architecture
 
@@ -41,6 +51,21 @@ Layout: `backend/src/{config,db,routes,controllers,middleware,utils}`. Routes ar
 - **Reservation validation order matters for QA**: existence checks (hotel by slug, then room ownership) are `404`s; field-shape checks (dates, guest count) are `400`s; the two explicit boundary rules — `fecha_salida` must be strictly after `fecha_entrada` (equal dates fail too) and `huespedes` must not exceed the room's `capacidad_huespedes` (exactly-at-capacity passes) — are deliberate QA boundary targets from spec section 12. Date comparisons are done as `YYYY-MM-DD` strings (validated format sorts correctly lexically), against `new Date().toISOString().slice(0,10)` as "today" (UTC-based).
 - **WhatsApp numbers are normalized, not validated as phone numbers**: `utils/phone.js#normalizePhone` just strips everything but digits before building the `wa.me` URL, so a hotel can store `whatsapp_numero` with `+`, spaces, or dashes. If it normalizes to an empty string (missing/garbage), the reservation endpoint returns `400`.
 - **Contacto is intentionally persisted**, not fire-and-forget: `POST /contacto` (spec section 5) writes to the `contactos` table and logs a `console.log` standing in for a real email send (same `dev_note` pattern as password reset). `GET /admin/contactos` exists specifically so this is verifiable via Postman without server console access — keep that pairing if you touch either endpoint.
+- **Only one banner can be `activo` at a time** (spec section 9.1), enforced in the application layer, not a DB constraint: `POST /admin/banners/:id/activar` (`adminBanner.controller.js`) deactivates every other row inside the same `db.transaction`, then activates the target. `POST`/`PUT` on `/admin/banners` never touch `activo` directly — activation is deliberately a separate action, mirroring the hotel activar/desactivar split. `PUT` with an `imagenes` array replaces the whole gallery (delete-all-then-reinsert) rather than diffing individual images.
+- **The banner backend was added in Phase 5, not Phase 2-4**, specifically because the frontend Home needed `GET /public/banner` to build the carousel — it wasn't originally planned as backend scope. If you're looking for "when was banner_destacado added," it's tied to the frontend Home work, not the admin-panel phases.
+
+## Frontend architecture
+
+React + Vite, plain JS (no TypeScript), `react-router-dom` for routing, no state management library (local `useState`/`useEffect` only — the app doesn't need more yet). Layout: `frontend/src/{api,context,components,pages,styles,utils}`.
+
+- **Dark-by-default theming, not system-preference-based**: `context/ThemeContext.jsx` reads `localStorage.theme` and defaults to `'dark'` if unset — it deliberately does **not** consult `prefers-color-scheme`, per spec section 10's explicit "oscuro por defecto." The CSS itself mirrors this: `:root` in `styles/global.css` holds the dark values directly (not gated behind `[data-theme="dark"]`), with `:root[data-theme="light"]` as the override — so there's no flash-of-wrong-theme before JS runs.
+- **Exactly 3 hue-bearing colors** in `global.css` custom properties (spec section 10's cap): a gold accent, a charcoal neutral, and a cream neutral. The charcoal/cream pair swaps between bg/text roles depending on `data-theme`; don't add a 4th brand color without checking the spec constraint still applies.
+- **Country flags are emoji, computed locally, no network/CDN dependency**: `utils/countryFlags.js` maps a hardcoded set of Spanish country names to ISO alpha-2 codes, then converts to a flag emoji via Unicode regional indicator math. `hotel.pais` is free-text on the backend (no ISO code stored), so unmapped country names fall back to a generic white-flag emoji rather than erroring — extend the lookup table rather than trying to make this fuzzy-match.
+- **Fonts are bundled via `@fontsource`, not a Google Fonts `<link>`**: avoids a runtime dependency on an external CDN. If you add font weights, import the specific `@fontsource/<family>/<weight>.css` files in `main.jsx` rather than pulling in the whole family.
+- **`FM_WEB_LAB_URL` is an unset env var by design** (`VITE_FM_WEB_LAB_URL`, read in `Footer.jsx`, falls back to `#`): the spec requires crediting "FM WEB LAB" with a link, but no real URL was ever provided. Don't invent/guess one — fill in the env var once the real URL is known.
+- **Routes exist for pages that aren't built yet**: `/destinos`, `/contacto`, `/registro`, `/login`, and `/:slug` (hotel public profile) all render `components/ProximamentePage.jsx` placeholders so header navigation and hotel-card links don't 404. When you implement one of these for real, replace the page component in `pages/`, not the route wiring in `App.jsx`.
+- **`pages/Home.jsx` fetches the hotel list twice on purpose**: once unfiltered (to derive the país/ciudad filter dropdown options, with ciudad cascading off the selected país) and once with the active filters (debounced 300ms) to render the grid. Don't collapse these into one fetch — the dropdowns need the *unfiltered* option set even when a filter is currently narrowing the displayed grid.
+- **No screenshot-based UI verification has happened yet** (see Commands section) — treat any prior "it works" claim about the frontend as build-verified and API-shape-verified only, not visually verified, until someone actually opens it in a browser.
 
 ## What this project is
 
@@ -76,13 +101,13 @@ Enforcing the role/permission boundary strictly matters here — it's called out
 
 ## Key routes / pages (spec section references)
 
-- `/` — Home: featured hotel banner (carousel, admin-managed), alphabetical hotel listing, filters (país/ciudad/rango de precio)
-- `/destinos` — Destination content per country/city, cached periodically from external sources. **Never copy source text verbatim** — must be original summary + backlink to source. Backend: `GET /api/public/destinos` (see API.md); the "periodic cache" is currently simulated, not a real fetch — see the Destinos bullets above.
-- `/contacto` — General platform contact form (not hotel-specific). Backend: `POST /api/contacto`.
-- Registro / Login / password recovery for hotels
-- Hotel panel (post-login): datos generales (7.1), habitaciones (7.2, min 4), estado Activar/Desactivar (7.3)
-- `/[nombre-del-hotel]` (e.g. `/hotelfaraon`) — Public hotel profile with room listing and a reservation form that redirects to **WhatsApp** with prefilled message (no real payment gateway — out of scope). Backend: `POST /api/public/hoteles/:slug/reservas` — stateless, see the reservation bullets above.
-- `/admin` — Super admin panel, including banner/featured-hotel management (9.1: image gallery, link, title, description; only one featured hotel active at a time)
+- `/` — Home: featured hotel banner (carousel, admin-managed), alphabetical hotel listing, filters (país/ciudad/rango de precio). **Built** (frontend `pages/Home.jsx` + `components/BannerCarousel.jsx`, `HotelFilters.jsx`, `HotelList.jsx`). Backend: `GET /api/public/hoteles`, `GET /api/public/banner`.
+- `/destinos` — Destination content per country/city, cached periodically from external sources. **Never copy source text verbatim** — must be original summary + backlink to source. Backend built: `GET /api/public/destinos` (the "periodic cache" is currently simulated, not a real fetch — see the Destinos bullets above). Frontend: placeholder page only.
+- `/contacto` — General platform contact form (not hotel-specific). Backend built: `POST /api/contacto`. Frontend: placeholder page only.
+- Registro / Login / password recovery for hotels. Backend built (`/api/auth/hotel/*`). Frontend: placeholder pages only, not wired to the API yet.
+- Hotel panel (post-login): datos generales (7.1), habitaciones (7.2, min 4), estado Activar/Desactivar (7.3). Backend built (`/api/hotel/*`). No frontend yet at all (not even a placeholder route).
+- `/[nombre-del-hotel]` (e.g. `/hotelfaraon`) — Public hotel profile with room listing and a reservation form that redirects to **WhatsApp** with prefilled message (no real payment gateway — out of scope). Backend built: `POST /api/public/hoteles/:slug/reservas` — stateless, see the reservation bullets above. Frontend: `/:slug` route exists and renders a placeholder (`pages/HotelPerfil.jsx`); hotel cards on Home already link there.
+- `/admin` — Super admin panel, including banner/featured-hotel management (9.1: image gallery, link, title, description; only one featured hotel active at a time). Backend built (`/api/admin/*`, including `/admin/banners/*`). No frontend yet at all (not even a placeholder route).
 
 Note: hotel profile uses a path (`/hotelfaraon`), not a real subdomain — deliberate choice to avoid DNS/hosting config, per spec section 8.
 

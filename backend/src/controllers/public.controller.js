@@ -71,4 +71,27 @@ async function listDestinos(req, res) {
   res.json({ destinos: rows });
 }
 
-module.exports = { listHoteles, listDestinos };
+async function getBannerActivo(req, res) {
+  const banner = db.prepare('SELECT * FROM banner_destacado WHERE activo = 1 LIMIT 1').get();
+
+  if (!banner) {
+    return res.json({ banner: null });
+  }
+
+  const imagenes = db
+    .prepare('SELECT url FROM banner_imagenes WHERE banner_id = ? ORDER BY orden ASC, id ASC')
+    .all(banner.id)
+    .map((row) => row.url);
+
+  return res.json({
+    banner: {
+      id: banner.id,
+      titulo: banner.titulo,
+      descripcion: banner.descripcion,
+      link: banner.link,
+      imagenes,
+    },
+  });
+}
+
+module.exports = { listHoteles, listDestinos, getBannerActivo };
