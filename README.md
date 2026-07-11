@@ -2,9 +2,9 @@
 
 Plataforma tipo directorio/marketplace de hoteles. Ver [SPEC.md](./SPEC.md) para la especificación completa del proyecto.
 
-## Estado actual: Fase 8
+## Estado actual: Fase 9
 
-Fase 1 entregó la base (estructura, Express, esquema SQLite). Fase 2 agregó los endpoints REST principales: auth de hotel (JWT), CRUD de habitaciones, activar/desactivar, listado público con filtros, y auth + gestión de super admin. Fase 3 sumó los endpoints de Destinos y un refresh de cache simulado. Fase 4 agregó el link de reserva a WhatsApp y el formulario de contacto general. Fase 5 arrancó el frontend en React (Vite) con el Home público completo, y sumó al backend el CRUD del banner destacado que el Home necesitaba consumir. Fase 6 conectó Registro, Login, y recuperación/restablecimiento de contraseña del hotel al frontend, con sesión persistida. Fase 7 construyó el panel real del hotel (`/panel-hotel`) y corrigió un gap encontrado ahí mismo: la regla de visibilidad ("activo Y ≥4 habitaciones") ahora se aplica con dos capas independientes (auto-desactivación al eliminar una habitación + filtro por conteo en la query pública). Fase 8 construye el perfil público del hotel (`/:slug`): datos generales, listado de habitaciones, y el formulario de reserva conectado al link de WhatsApp — y suma al backend el `GET /api/public/hoteles/:slug` que esa página necesitaba. Ver [API.md](./API.md) para el detalle de cada endpoint. Destinos, Contacto y el panel de super admin siguen siendo placeholders (o no existen todavía).
+Fase 1 entregó la base (estructura, Express, esquema SQLite). Fase 2 agregó los endpoints REST principales: auth de hotel (JWT), CRUD de habitaciones, activar/desactivar, listado público con filtros, y auth + gestión de super admin. Fase 3 sumó los endpoints de Destinos y un refresh de cache simulado. Fase 4 agregó el link de reserva a WhatsApp y el formulario de contacto general. Fase 5 arrancó el frontend en React (Vite) con el Home público completo, y sumó al backend el CRUD del banner destacado que el Home necesitaba consumir. Fase 6 conectó Registro, Login, y recuperación/restablecimiento de contraseña del hotel al frontend, con sesión persistida. Fase 7 construyó el panel real del hotel (`/panel-hotel`) y corrigió un gap encontrado ahí mismo: la regla de visibilidad ("activo Y ≥4 habitaciones") ahora se aplica con dos capas independientes (auto-desactivación al eliminar una habitación + filtro por conteo en la query pública). Fase 8 construyó el perfil público del hotel (`/:slug`), sumando al backend el `GET /api/public/hoteles/:slug` que necesitaba. Fase 9 construye el panel Super Admin (`/admin`, con login separado en `/admin/login`): listado de hoteles activos/inactivos con eliminar, formulario para agregar hotel manualmente, y gestión completa del banner destacado (crear/editar/eliminar/activar/desactivar, galería de imágenes). Todos los endpoints que necesitaba ya existían desde fases anteriores — Fase 9 es 100% frontend. Ver [API.md](./API.md) para el detalle de cada endpoint. Solo Destinos y Contacto siguen siendo placeholders.
 
 ## Estructura
 
@@ -25,12 +25,13 @@ Fase 1 entregó la base (estructura, Express, esquema SQLite). Fase 2 agregó lo
 └── frontend/           # React + Vite
     └── src/
         ├── api/           # cliente fetch hacia el backend
-        ├── context/       # ThemeContext (modo oscuro/claro), AuthContext (sesión de hotel)
-        ├── components/    # Header, Footer, Layout, BannerCarousel, HotelCard, HotelFilters, HotelList, FormField, PrivateRoute
+        ├── context/       # ThemeContext (modo oscuro/claro), AuthContext (sesión de hotel), AdminAuthContext (sesión de admin, separada)
+        ├── components/    # Header, Footer, Layout, BannerCarousel, HotelCard, HotelFilters, HotelList, FormField, PrivateRoute, AdminPrivateRoute
         │   ├── panel/       # PanelDatosGenerales, PanelHabitaciones, HabitacionForm, PanelActivacion
-        │   └── hotel-perfil/ # HotelNoEncontrado, ReservaForm
-        ├── pages/         # Home, Registro, Login, RecuperarPassword, RestablecerPassword, PanelHotel, HotelPerfil (completos)
-        │                  # + placeholders (Destinos, Contacto)
+        │   ├── hotel-perfil/ # HotelNoEncontrado, ReservaForm
+        │   └── admin/       # AdminHoteles, AdminAgregarHotelForm, AdminBanner, BannerForm
+        ├── pages/         # Home, Registro, Login, RecuperarPassword, RestablecerPassword, PanelHotel, HotelPerfil,
+        │                  # AdminLogin, AdminPanel (completos) + placeholders (Destinos, Contacto)
         ├── styles/        # global.css (variables de color, tipografías, layout, formularios)
         └── utils/         # countryFlags (país -> emoji), validators (email), dates (hoy en formato YYYY-MM-DD)
 ```
@@ -113,13 +114,15 @@ El panel de hotel tiene tres secciones: **Estado de publicación** (barra de pro
 
 El perfil público (`/:slug`) muestra logo, nombre, país/ciudad (con bandera), descripción, link a la web propia, el listado de habitaciones, y un formulario de reserva (nombre, habitación, fechas, huéspedes) que valida en el cliente las mismas reglas que el backend (fecha de salida posterior a la de entrada, no fechas pasadas, huéspedes dentro de la capacidad de la habitación elegida) y al enviarse abre el link de WhatsApp generado por el servidor — con un botón de respaldo por si el navegador bloquea la apertura automática. Si el hotel no existe, está inactivo, o no cumple el mínimo de habitaciones, se muestra una página "Hotel no encontrado" en vez de un error crudo (mismo criterio en los tres casos, no se filtra cuál de ellos ocurrió).
 
+El panel Super Admin (`/admin`) tiene su propia sesión completamente separada de la del hotel — token distinto, clave de `localStorage` distinta (`AdminAuthContext`, independiente de `AuthContext`), login en `/admin/login`. Un token de hotel nunca da acceso a `/admin` ni viceversa, reflejando en el frontend la separación de roles que ya exigía el backend (probado explícitamente: token de admin contra ruta de hotel → 403, y viceversa). Tres secciones: **Hoteles** (listas de activos e inactivos, cada uno con botón Eliminar con confirmación), **Agregar hotel manualmente** (todos los campos que soporta el backend, incluyendo credenciales de acceso opcionales), y **Banner destacado** (crear con galería de imágenes dinámica — agregar/quitar URLs —, editar, eliminar, y activar/desactivar; activar uno desactiva automáticamente cualquier otro, como exige la spec). Visualmente se diferencia del panel de hotel con un badge "ADMIN" y un acento más marcado, sin sumar un color nuevo a la paleta (la spec limita a 3 colores).
+
 `/destinos` y `/contacto` siguen mostrando "Próximamente".
 
 **Nota sobre recuperación de contraseña**: como el backend todavía no envía emails reales (ver `dev_note` en la respuesta de `forgot-password`), la página `/recuperar-password` muestra el token de desarrollo directamente en pantalla con un botón para continuar — es un atajo intencional para poder probar el flujo completo sin Postman ni servidor de correo; hay que reemplazarlo cuando se conecte un servicio de email real.
 
 ## Próximas fases
 
-- Frontend: Destinos, Contacto, panel de super admin (incluyendo la UI para gestionar el banner)
+- Frontend: Destinos, Contacto
 - Subida de archivos (logo, fotos de habitaciones, imágenes de banner)
 - Envío real de correo para recuperación de contraseña y para el formulario de contacto
 - Conectar el refresh de Destinos a una fuente externa real (hoy es simulado)

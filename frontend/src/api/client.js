@@ -89,3 +89,47 @@ export function activarHotel(token) {
 export function desactivarHotel(token) {
   return request('/hotel/desactivar', { method: 'POST', headers: authHeaders(token) });
 }
+
+export function loginAdmin(credenciales) {
+  return request('/auth/admin/login', { method: 'POST', body: JSON.stringify(credenciales) });
+}
+
+export function getHotelesActivos(token) {
+  return request('/admin/hoteles/activos', { headers: authHeaders(token) });
+}
+
+export function getHotelesInactivos(token) {
+  return request('/admin/hoteles/inactivos', { headers: authHeaders(token) });
+}
+
+export function agregarHotelAdmin(token, datos) {
+  return request('/admin/hoteles', { method: 'POST', headers: authHeaders(token), body: JSON.stringify(datos) });
+}
+
+export function eliminarHotelAdmin(token, id) {
+  return request(`/admin/hoteles/${id}`, { method: 'DELETE', headers: authHeaders(token) });
+}
+
+export function getBanners(token) {
+  return request('/admin/banners', { headers: authHeaders(token) });
+}
+
+export function crearBanner(token, datos) {
+  return request('/admin/banners', { method: 'POST', headers: authHeaders(token), body: JSON.stringify(datos) });
+}
+
+export function actualizarBanner(token, id, datos) {
+  return request(`/admin/banners/${id}`, { method: 'PUT', headers: authHeaders(token), body: JSON.stringify(datos) });
+}
+
+export function eliminarBanner(token, id) {
+  return request(`/admin/banners/${id}`, { method: 'DELETE', headers: authHeaders(token) });
+}
+
+export function activarBanner(token, id) {
+  return request(`/admin/banners/${id}/activar`, { method: 'POST', headers: authHeaders(token) });
+}
+
+export function desactivarBanner(token, id) {
+  return request(`/admin/banners/${id}/desactivar`, { method: 'POST', headers: authHeaders(token) });
+}
