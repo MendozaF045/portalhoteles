@@ -52,6 +52,42 @@ async function listHoteles(req, res) {
   res.json({ hoteles: rows });
 }
 
+async function getHotelPublico(req, res) {
+  const { slug } = req.params;
+
+  // Igual regla de visibilidad de dos capas que /public/hoteles (activo Y >= minimo de
+  // habitaciones). Si no matchea por cualquiera de los dos motivos, respondemos 404 sin
+  // distinguir "no existe" de "existe pero inactivo" — no se filtra esa informacion.
+  const hotel = db
+    .prepare(`SELECT * FROM hoteles
+      WHERE slug = ? AND activo = 1
+        AND (SELECT COUNT(*) FROM habitaciones WHERE habitaciones.hotel_id = hoteles.id) >= ?`)
+    .get(slug, MIN_HABITACIONES);
+
+  if (!hotel) {
+    throw new HttpError(404, 'Hotel no encontrado');
+  }
+
+  const habitaciones = db
+    .prepare(`SELECT id, descripcion, tipo_bano, tamano_cama, capacidad_huespedes
+      FROM habitaciones WHERE hotel_id = ? ORDER BY id ASC`)
+    .all(hotel.id);
+
+  res.json({
+    hotel: {
+      id: hotel.id,
+      slug: hotel.slug,
+      nombre: hotel.nombre,
+      logo_url: hotel.logo_url,
+      pais: hotel.pais,
+      ciudad: hotel.ciudad,
+      descripcion: hotel.descripcion,
+      website_url: hotel.website_url,
+    },
+    habitaciones,
+  });
+}
+
 async function listDestinos(req, res) {
   const { pais, ciudad } = req.query;
   const clauses = [];
@@ -99,4 +135,6 @@ async function getBannerActivo(req, res) {
   });
 }
 
-module.exports = { listHoteles, listDestinos, getBannerActivo };
+module.exports = {
+  listHoteles, getHotelPublico, listDestinos, getBannerActivo,
+};

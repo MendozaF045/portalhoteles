@@ -30,6 +30,14 @@ export function getBannerActivo() {
   return request('/public/banner');
 }
 
+export function getHotelPublico(slug) {
+  return request(`/public/hoteles/${slug}`);
+}
+
+export function crearReserva(slug, datos) {
+  return request(`/public/hoteles/${slug}/reservas`, { method: 'POST', body: JSON.stringify(datos) });
+}
+
 export function registrarHotel(datos) {
   return request('/auth/hotel/registro', { method: 'POST', body: JSON.stringify(datos) });
 }

@@ -238,7 +238,28 @@ Un hotel con menos de 4 habitaciones nunca debería ser visible en el home, aunq
 1. **Auto-desactivación al eliminar una habitación** — `DELETE /hotel/habitaciones/:id` revisa el conteo después de borrar, dentro de la misma transacción: si queda por debajo de 4 y el hotel estaba activo, lo desactiva (`activo = 0`).
 2. **Filtro por conteo en la propia query pública** — `GET /public/hoteles` nunca confía solo en el flag `activo`; siempre re-cuenta habitaciones con una subquery correlacionada (`>= 4`) en el mismo `WHERE`. Esta capa es independiente de la primera: aunque `activo` quedara en `1` por cualquier otra vía (un bug futuro, una edición manual en la base de datos, etc.), el hotel igual no aparecería en el listado público sin las 4 habitaciones.
 
-Las dos capas comparten la misma constante `MIN_HABITACIONES` (definida una sola vez en `hotelEstado.controller.js` e importada donde hace falta), para que el mínimo nunca pueda quedar desincronizado entre `/hotel/activar`, la eliminación de habitaciones, y el listado público.
+Las dos capas comparten la misma constante `MIN_HABITACIONES` (definida una sola vez en `hotelEstado.controller.js` e importada donde hace falta), para que el mínimo nunca pueda quedar desincronizado entre `/hotel/activar`, la eliminación de habitaciones, y el listado público. La misma regla de dos capas se aplica también en `GET /public/hoteles/:slug` (abajo).
+
+### `GET /public/hoteles/:slug`
+
+Perfil público del hotel (SPEC.md sección 8): datos generales + listado de sus habitaciones, en una sola respuesta. Aplica la misma regla de visibilidad de dos capas que `GET /public/hoteles` — si el hotel no existe, **o** existe pero no está `activo`, **o** está activo pero tiene menos de `MIN_HABITACIONES` habitaciones, responde `404` en los tres casos por igual (nunca se filtra cuál de los tres pasó, mismo criterio que otros 404 del backend).
+
+Respuesta `200`:
+```json
+{
+  "hotel": {
+    "id": 1, "slug": "hotel-faraon", "nombre": "Hotel Faraon",
+    "logo_url": null, "pais": "Egipto", "ciudad": "Giza",
+    "descripcion": "Junto a las piramides", "website_url": "https://hotelfaraon.example"
+  },
+  "habitaciones": [
+    { "id": 1, "descripcion": "Habitacion 1", "tipo_bano": "Privado", "tamano_cama": "Queen", "capacidad_huespedes": 2 }
+  ]
+}
+```
+No incluye `whatsapp_numero` (el link de WhatsApp se arma server-side en `POST /public/hoteles/:slug/reservas`, el frontend nunca necesita el número directo) ni `precio_referencia`/`activo`/timestamps — es una vista pública mínima. Cada habitación tampoco incluye `precio` ni `fotos` (mismo alcance de campos que el panel de hotel expone hoy — ver la Fase 7 en CLAUDE.md).
+
+Errores: `404` (ver arriba).
 
 ### `GET /public/destinos`
 
@@ -507,6 +528,7 @@ Respuesta `200`:
 | POST | `/hotel/activar` | hotel | Activar (requiere ≥4 habitaciones) |
 | POST | `/hotel/desactivar` | hotel | Desactivar |
 | GET | `/public/hoteles` | — | Listado de hoteles activos con filtros |
+| GET | `/public/hoteles/:slug` | — | Perfil público del hotel (datos + habitaciones) |
 | GET | `/public/destinos` | — | Listado de destinos con filtros |
 | GET | `/public/banner` | — | Banner destacado activo (o null) |
 | POST | `/public/hoteles/:slug/reservas` | — | Generar link de reserva a WhatsApp |
@@ -535,8 +557,7 @@ Respuesta `200`:
 - Subida de archivos (logo, fotos de habitaciones) — hoy `logo_url`/`fotos`/imágenes de banner son solo strings/URLs
 - Envío real de correo para recuperación de contraseña y para el formulario de contacto
 - Conectar `destinosRefresh.js` a una fuente externa real (hoy genera contenido simulado)
-- Perfil público detallado por hotel (`/[slug]`) — el frontend ya tiene la ruta, pero la página es un placeholder
-- Frontend: Destinos, Contacto, panel de super admin (hoy solo Home, Registro/Login/recuperación y el panel de hotel están construidos)
+- Frontend: Destinos, Contacto, panel de super admin (hoy Home, Registro/Login/recuperación, el panel de hotel, y el perfil público del hotel están construidos)
 
 ## Corregido: `activo` vs. cantidad de habitaciones (ver "Regla de visibilidad" en la sección 3)
 
