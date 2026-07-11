@@ -6,12 +6,23 @@
   --color-accent-strong: #dbb968;
   --color-accent-contrast: #1a1408;
 
+  /* Dorado de acento usado como TEXTO (links, precio) necesita mas contraste
+     en modo claro que el dorado "de fondo" (botones/badges, que ya va
+     emparejado con --color-accent-contrast). Misma familia de color, no es
+     un 4to color: solo una variante mas oscura para legibilidad. */
+  --color-link: var(--color-accent);
+
   --color-bg: #14171c;
   --color-surface: #1c2027;
   --color-surface-alt: #232833;
   --color-text: #f2ede1;
   --color-text-muted: #a9afba;
   --color-border: #2b303a;
+
+  /* Color de error/invalido, tambien theme-aware (ver nota de --color-link). */
+  --color-error: #e0846a;
+  --color-error-soft-bg: rgba(224, 132, 106, 0.12);
+  --color-error-soft-border: rgba(224, 132, 106, 0.4);
 
   --radius: 12px;
   --radius-sm: 10px;
@@ -32,6 +43,12 @@
   --color-text-muted: #5b6270;
   --color-border: #e2ddd0;
   --color-accent-contrast: #1a1408;
+
+  --color-link: #83651c;
+
+  --color-error: #b8452b;
+  --color-error-soft-bg: rgba(184, 69, 43, 0.1);
+  --color-error-soft-border: rgba(184, 69, 43, 0.35);
 
   --shadow: 0 4px 16px rgba(20, 23, 28, 0.1);
 
@@ -69,7 +86,7 @@ p {
 }
 
 a {
-  color: var(--color-accent);
+  color: var(--color-link);
   text-decoration: none;
 }
 
@@ -208,7 +225,7 @@ select {
 }
 
 .site-header__brand span {
-  color: var(--color-accent);
+  color: var(--color-link);
 }
 
 .site-header__nav {
@@ -377,6 +394,14 @@ select {
   .banner-carousel__frame {
     aspect-ratio: 4 / 5;
   }
+
+  /* En el aspect-ratio angosto de mobile el overlay (titulo + descripcion)
+     ocupa mas alto proporcionalmente; los dots se mueven arriba para no
+     solaparse con ese texto en vez de competir por el mismo rincon. */
+  .banner-carousel__dots {
+    top: 1rem;
+    bottom: auto;
+  }
 }
 
 /* Home section */
@@ -451,7 +476,7 @@ select {
 }
 
 .hotel-list__status--error {
-  color: #d97a5f;
+  color: var(--color-error);
 }
 
 /* Hotel card */
@@ -521,7 +546,7 @@ select {
 .hotel-card__price {
   margin: 0;
   font-weight: 600;
-  color: var(--color-accent);
+  color: var(--color-link);
 }
 
 /* Forms (Registro, Login, recuperar/restablecer password) */
@@ -593,7 +618,7 @@ select {
 
 .form-field input[aria-invalid='true'],
 .form-field textarea[aria-invalid='true'] {
-  border-color: #d97a5f;
+  border-color: var(--color-error);
 }
 
 .form-field textarea {
@@ -604,7 +629,7 @@ select {
 .form-field__error {
   margin: 0;
   font-size: 0.8rem;
-  color: #d97a5f;
+  color: var(--color-error);
 }
 
 .form-page__submit {
@@ -635,9 +660,9 @@ select {
 }
 
 .form-banner--error {
-  background-color: rgba(217, 122, 95, 0.12);
-  border: 1px solid rgba(217, 122, 95, 0.4);
-  color: #d97a5f;
+  background-color: var(--color-error-soft-bg);
+  border: 1px solid var(--color-error-soft-border);
+  color: var(--color-error);
 }
 
 .form-banner--success {
@@ -730,7 +755,7 @@ select {
 }
 
 .panel-activacion__aviso {
-  color: #d97a5f;
+  color: var(--color-error);
   font-size: 0.9rem;
   margin-bottom: 1rem;
 }
@@ -786,11 +811,21 @@ select {
 
 .panel-habitacion__acciones {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.5rem;
-  flex-shrink: 0;
 }
 
 .habitacion-form {
+  /* flex: 1 1 100% es lo que evita que este formulario quede comprimido a su
+     ancho de contenido cuando aparece como hijo directo de .panel-habitacion
+     (que es display:flex en fila) durante la edicion inline — sin esto, el
+     formulario de editar una habitacion o un banner se ve angosto/roto,
+     mucho mas notorio en mobile/tablet donde hay menos espacio disponible.
+     No afecta su uso normal dentro de .panel-section (contenedor de bloque),
+     donde la propiedad flex simplemente no aplica. */
+  flex: 1 1 100%;
+  width: 100%;
   padding: 1.25rem;
   margin-bottom: 1.1rem;
   border: 1px solid var(--color-border);
@@ -909,17 +944,23 @@ select {
 
 .banner-form__imagen-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.5rem;
 }
 
 .banner-form__imagen-row input {
-  flex: 1;
+  flex: 1 1 12rem;
+  min-width: 0;
   padding: 0.5rem 0.65rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   background-color: var(--color-bg);
   color: var(--color-text);
+}
+
+.banner-form__imagen-row .btn {
+  flex-shrink: 0;
 }
 
 .banner-form__agregar-imagen {
