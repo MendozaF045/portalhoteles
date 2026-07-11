@@ -30,6 +30,14 @@ export function getBannerActivo() {
   return request('/public/banner');
 }
 
+export function getDestinos(filtros = {}) {
+  return request(`/public/destinos${buildQuery(filtros)}`);
+}
+
+export function enviarContacto(datos) {
+  return request('/contacto', { method: 'POST', body: JSON.stringify(datos) });
+}
+
 export function getHotelPublico(slug) {
   return request(`/public/hoteles/${slug}`);
 }

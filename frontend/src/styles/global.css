@@ -929,3 +929,42 @@ select {
 .admin-banner-row--editando {
   align-items: stretch;
 }
+
+/* Destinos */
+
+.page-intro {
+  color: var(--color-text-muted);
+  margin-bottom: 1.5rem;
+  max-width: 60ch;
+}
+
+.destinos-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.destino-card {
+  padding: 1.25rem;
+}
+
+.destino-card__ubicacion {
+  margin: 0 0 0.4rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.destino-card__titulo {
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+}
+
+.destino-card__resumen {
+  color: var(--color-text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.destino-card__fuente {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
